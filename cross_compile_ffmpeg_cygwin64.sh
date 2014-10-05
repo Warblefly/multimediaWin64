@@ -1454,12 +1454,12 @@ gcc_cpu_count=1 # allow them to specify more than 1, but default to the one that
 build_ffmpeg_static=y
 build_ffmpeg_shared=n
 build_libav=n
-build_libmxf=n
-build_mp4box=n
+build_libmxf=y
+build_mp4box=y
 build_mplayer=n
 build_vlc=n
 git_get_latest=y
-prefer_stable=y
+prefer_stable=n
 unset CFLAGS # I think this resets it...we don't want any linux CFLAGS seeping through...they can set this via --cflags=  if they want it set to anything
 original_cflags= # no export needed, this is just a local copy
 

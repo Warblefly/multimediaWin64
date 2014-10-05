@@ -21,7 +21,7 @@ HOW TO
 2.  Checkout the script cross_compile_ffmpeg_cygwin.sh
 3.  Make sure it is executable.
 4.  Run it with this command line:
-    ./cross_compile_ffmpeg_cygwin64.sh --build-ffmpeg-shared=n --build-ffmpeg-static=y --disable-nonfree=n --sandbox-ok=y --build-libmxf=y --build-mp4box=y --build-choice=win64 --cflags=-march=core2 --git-get-latest=y --prefer-stable=n
+    ./cross_compile_ffmpeg_cygwin64.sh --build-ffmpeg-shared=n --build-ffmpeg-static=y --disable-nonfree=n --sandbox-ok=y --build-libmxf=y --build-mp4box=y --build-choice=win64 --git-get-latest=y --prefer-stable=n
 5.  Copy binaries from ./sandbox/mingw-w64-x86_64/x86_64-w64-mingw32/bin
 6.  Enjoy and share.
 7.  Run the command again to incorporate updates. Only the parts that need rebuilding will be built.
