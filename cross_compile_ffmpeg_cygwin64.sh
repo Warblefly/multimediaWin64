@@ -361,6 +361,21 @@ download_and_unpack_file() {
   fi
 }
 
+download_and_unpack_bz2file() {
+  url="$1"
+  output_name=$(basename $url)
+  output_dir="$2"
+  if [ ! -f "$output_dir/unpacked.successfully" ]; then
+    echo "downloading $url"
+    curl "$url" -O -L || exit 1
+    tar -xf "$output_name" || bunzip2 $output_name || exit 1
+    touch "$output_dir/unpacked.successfully" || exit 1
+    rm "$output_name"
+  fi
+}
+
+
+
 generic_configure() {
   local extra_configure_options="$1"
   do_configure "--host=$host_target --prefix=$mingw_w64_x86_64_prefix --disable-shared --enable-static $extra_configure_options"
@@ -975,6 +990,54 @@ build_libMXFpp() {
   cd ..
 }
 
+build_mediainfo() {
+		echo "compile MediaInfo_CLI"
+		rm -rf mediainfo
+		# Mediainfo unfortunately uses svn, which takes a LOT of downloading; unfortunately, there is no
+                # immediate way of knowing if the code has been updated.
+                # So, we download it and check the MD5 of the downloaded archive, comparing it to anything that
+                # has been compiled before. If they're the same, we don't compile.
+
+#		a=`wget -qO- "http://sourceforge.net/projects/mediainfo/files/source/mediainfo/" | sed "s/<tbody>/\n<tbody>\n/g;s/<\/tbody>/\n<\/tbody>\n/g" | awk "/<tbody>/,/<\/tbody>/" | grep "tr.*title.*class.*folder" | sed "s/<tr.\.*title=\d034//g;s/\d034 class.*$//g" | sed "q1" | sed "s/%%20//g" | sed "s/ //g"`
+
+#		b=`wget -qO- "http://sourceforge.net/projects/mediainfo/files/source/mediainfo/$a/" | sed "s/<tbody>/\n<tbody>\n/g;s/<\/tbody>/\n<\/tbody>\n/g" | awk "/<tbody>/,/<\/tbody>/" | grep "tr.*title.*class.*file" | sed "s/<tr.\.*title=\d034//g;s/\d034 class.*$//g" | grep "7z" | sed "s/ //g"`
+
+#		wget --tries=20 --retry-connrefused --waitretry=2 -c -O mediainfo.7z "http://sourceforge.net/projects/mediainfo/files/source/mediainfo/$a/$b/download"
+		
+#		mkdir mediainfo
+
+#		cd mediainfo
+#		if [[ ! f ./mediainfo.md5 ]]; then
+#		  md5sum ../mediainfo.7z > mediainfo.md5
+#		fi
+		
+#		7za x ../mediainfo.7z
+#		rm ../mediainfo.7z
+                mkdir mediainfo
+		cd mediainfo
+		do_svn_checkout svn://svn.code.sf.net/p/mediainfo/code/MediaInfo/trunk MediaInfo
+		do_svn_checkout svn://svn.code.sf.net/p/mediainfo/code/MediaInfoLib/trunk MediaInfoLib
+		do_svn_checkout svn://svn.code.sf.net/p/zenlib/code/ZenLib/trunk ZenLib
+		sed -i '/#include <windows.h>/ a\#include <time.h>' ZenLib/Source/ZenLib/Ztring.cpp
+		cd ZenLib/Project/GNU/Library
+		./autogen
+		./configure --enable-shared=no --enable-static --prefix=$mingw_w64_x86_64_prefix --host=x86_64-w64-mingw32
+		sed -i 's/ -DSIZE_T_IS_LONG//g' Makefile
+		do_make_install
+		cd ../../../../MediaInfoLib/Project/GNU/Library
+		./autogen
+		./configure --enable-shared=no --enable-static --host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix LDFLAGS="$LDFLAGS -static-libgcc"
+		sed -i 's/ -DSIZE_T_IS_LONG//g' Makefile
+		do_make_install
+		cd ../../../../MediaInfo/Project/GNU/CLI
+		./autogen
+		./configure --enable-static --host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix --enable-staticlibs --enable-shared=no LDFLAGS="$LDFLAGS -static-libgcc"
+		sed -i 's/ -DSIZE_T_IS_LONG//g' Makefile
+		do_make_install
+#                cd ../../../../..
+		cd ../../../../..
+		echo "Now returned to `pwd`"
+}
 
 build_libtool() {
   generic_download_and_install http://ftpmirror.gnu.org/libtool/libtool-2.4.2.tar.gz libtool-2.4.2
@@ -1415,6 +1478,7 @@ build_dependencies() {
 build_apps() {
   # now the things that use the dependencies...
   build_opustools
+  build_mediainfo
   if [[ $build_libmxf = "y" ]]; then
     build_libMXF
     build_libMXFpp
