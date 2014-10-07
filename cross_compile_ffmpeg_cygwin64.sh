@@ -1391,6 +1391,8 @@ build_dependencies() {
     cd gsm-1.0-pl13
     make uninstall
     cd ..
+    rm $mingw_w64_x86_64_prefix/lib/libgsm.a # because make uninstall in gsm-1.0-pl13 
+                                             # doesn't actually remove the installed library
   fi
   build_libsndfile
   build_libbs2b
