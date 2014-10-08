@@ -33,8 +33,8 @@ check_missing_packages () {
     clear
     echo "Could not find the following execs (svn is actually package subversion, makeinfo is actually package texinfo if you're missing them): ${missing_packages[@]}"
     echo 'Install the missing packages before running this script.'
-    echo "for ubuntu: $ sudo apt-get install subversion texinfo g++ bison flex cvs yasm automake libtool autoconf curl gcc cmake git make pkg-config zlib1g-dev mercurial" 
-    echo "for gentoo (a non ubuntu distro): same, but no g++, no gcc, git is dev-vcs/git, zlib1g-dev is zlib, pkg-config is dev-util/pkgconfig, add ed, AFAICT"
+    echo "for ubuntu: $ sudo apt-get install subversion curl texinfo g++ bison flex cvs yasm automake libtool autoconf gcc cmake git make pkg-config zlib1g-dev mercurial" 
+    echo "for gentoo (a non ubuntu distro): same as above, but no g++, no gcc, git is dev-vcs/git, zlib1g-dev is zlib, pkg-config is dev-util/pkgconfig, add ed..."
     exit 1
   fi
 
@@ -88,8 +88,8 @@ EOL
     if  [[ $disable_nonfree = "n" ]]; then
       non_free="y" 
     else
-      yes_no_sel "Would you like to include non-free (non GPL compatible) libraries, like many aac encoders
-The resultant binary will not be distributable, but might be useful for in-house use. Include non-free [y/N]?" "n"
+      yes_no_sel "Would you like to include non-free (non GPL compatible) libraries, like many high quality aac encoders [libfdk_aac]
+The resultant binary may not be distributable, but can be useful for in-house use. Include these non-free-license libraries [y/N]?" "n"
       non_free="$user_input" # save it away
     fi
   fi
