@@ -265,6 +265,12 @@ do_configure() {
     if [ -f bootstrap.sh ]; then
       ./bootstrap.sh
     fi
+    if [ -f autogen.sh ]; then
+      ./autogen.sh
+    fi
+    if [ -f autogen ]; then
+      ./autogen
+    fi
     rm -f already_* # reset
     echo "configuring $english_name ($PWD) as $ PATH=$PATH $configure_name $configure_options"
     nice "$configure_name" $configure_options || exit 1
@@ -368,7 +374,8 @@ download_and_unpack_bz2file() {
   if [ ! -f "$output_dir/unpacked.successfully" ]; then
     echo "downloading $url"
     curl "$url" -O -L || exit 1
-    tar -xf "$output_name" || bunzip2 $output_name || exit 1
+    mkdir $output_dir
+    tar ixvf "$output_name" -C $output_dir --strip-components=1 || exit 1
     touch "$output_dir/unpacked.successfully" || exit 1
     rm "$output_name"
   fi
@@ -599,7 +606,7 @@ build_libvpx() {
   if [[ "$bits_target" = "32" ]]; then
     do_configure "--extra-cflags=-DPTW32_STATIC_LIB --target=x86-win32-gcc --prefix=$mingw_w64_x86_64_prefix --enable-static --disable-shared"
   else
-    do_configure "--extra-cflags=-DPTW32_STATIC_LIB --target=x86_64-win64-gcc --prefix=$mingw_w64_x86_64_prefix --enable-static --disable-shared "
+    do_configure "--extra-cflags=-DPTW32_STATIC_LIB --target=x86_64-win64-gcc --prefix=$mingw_w64_x86_64_prefix --enable-static --disable-shared --disable-unit-tests --disable-encode-perf-tests --disable-decode-perf-tests"
   fi
   do_make_install
   unset CROSS
@@ -886,8 +893,8 @@ build_libaacplus() {
 }
 
 build_openssl() {
-  download_and_unpack_file http://www.openssl.org/source/openssl-1.0.1g.tar.gz openssl-1.0.1g
-  cd openssl-1.0.1g
+  download_and_unpack_file http://www.openssl.org/source/openssl-1.0.2-beta3.tar.gz openssl-1.0.2-beta3
+  cd openssl-1.0.2-beta3
   export cross="$cross_prefix"
   export CC="${cross}gcc"
   export AR="${cross}ar"
@@ -992,7 +999,7 @@ build_libMXFpp() {
 
 build_mediainfo() {
 		echo "compile MediaInfo_CLI"
-		rm -rf mediainfo
+		# rm -rf mediainfo
 		# Mediainfo unfortunately uses svn, which takes a LOT of downloading; unfortunately, there is no
                 # immediate way of knowing if the code has been updated.
                 # So, we download it and check the MD5 of the downloaded archive, comparing it to anything that
@@ -1013,25 +1020,25 @@ build_mediainfo() {
 		
 #		7za x ../mediainfo.7z
 #		rm ../mediainfo.7z
-                mkdir mediainfo
+                if [[ ! -d mediainfo ]]; then
+		  mkdir mediainfo
+		fi
 		cd mediainfo
-		do_svn_checkout svn://svn.code.sf.net/p/mediainfo/code/MediaInfo/trunk MediaInfo
-		do_svn_checkout svn://svn.code.sf.net/p/mediainfo/code/MediaInfoLib/trunk MediaInfoLib
-		do_svn_checkout svn://svn.code.sf.net/p/zenlib/code/ZenLib/trunk ZenLib
+		do_svn_checkout http://svn.code.sf.net/p/mediainfo/code/MediaInfo/trunk MediaInfo
+		do_svn_checkout http://svn.code.sf.net/p/mediainfo/code/MediaInfoLib/trunk MediaInfoLib
+		do_svn_checkout http://svn.code.sf.net/p/zenlib/code/ZenLib/trunk ZenLib
 		sed -i '/#include <windows.h>/ a\#include <time.h>' ZenLib/Source/ZenLib/Ztring.cpp
 		cd ZenLib/Project/GNU/Library
-		./autogen
-		./configure --enable-shared=no --enable-static --prefix=$mingw_w64_x86_64_prefix --host=x86_64-w64-mingw32
+
+                generic_configure "--enable-shared=no --enable-static --prefix=$mingw_w64_x86_64_prefix --host=x86_64-w64-mingw32"
 		sed -i 's/ -DSIZE_T_IS_LONG//g' Makefile
 		do_make_install
 		cd ../../../../MediaInfoLib/Project/GNU/Library
-		./autogen
-		./configure --enable-shared=no --enable-static --host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix LDFLAGS="$LDFLAGS -static-libgcc"
+		do_configure "--enable-shared=no --enable-static --host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix LDFLAGS=-static-libgcc"
 		sed -i 's/ -DSIZE_T_IS_LONG//g' Makefile
 		do_make_install
 		cd ../../../../MediaInfo/Project/GNU/CLI
-		./autogen
-		./configure --enable-static --host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix --enable-staticlibs --enable-shared=no LDFLAGS="$LDFLAGS -static-libgcc"
+		do_configure "--enable-static --host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix --enable-staticlibs --enable-shared=no LDFLAGS=-static-libgcc"
 		sed -i 's/ -DSIZE_T_IS_LONG//g' Makefile
 		do_make_install
 #                cd ../../../../..
@@ -1162,7 +1169,16 @@ build_flac() {
   cd ..
 }
 
-
+build_makemkv() { # THIS IS NOT WORKING - MAKEMKV NEEDS MORE THAN MINGW OFFERS
+  download_and_unpack http://www.makemkv.com/download/makemkv-oss-1.8.13.tar.gz makemkv-oss-1.8.13
+  cd makemkv-oss-1.8.13
+  sed -i 's/,-z,/,/' Makefile.in
+  generic_configure "--disable-gui"
+  sed -i 's/#include <alloca.h>/#include <malloc.h>/' libmmbd/src/mmconn.cpp
+  do_make_install
+  generic_download_and_install http://www.makemkv.com/download/makemkv-bin-1.8.13.tar.gz makemkv-bin-1.8.13
+  cd ..
+}
 
 build_vlc() {
   build_qt # needs libjpeg [?]
@@ -1204,22 +1220,26 @@ build_vlc() {
 }
 
 build_mplayer() {
-  download_and_unpack_file http://sourceforge.net/projects/mplayer-edl/files/mplayer-export-snapshot.2014-05-19.tar.bz2/download mplayer-export-2014-05-19
-  cd mplayer-export-2014-05-19
-  do_git_checkout https://github.com/FFmpeg/FFmpeg ffmpeg d43c303038e9bd
+  download_and_unpack_bz2file http://www.mplayerhq.hu/MPlayer/releases/mplayer-export-snapshot.tar.bz2 mplayer
+  cd mplayer
+  do_git_checkout https://github.com/FFmpeg/FFmpeg ffmpeg
   export LDFLAGS='-lpthread -ldvdread -ldvdcss' # not compat with newer dvdread possibly? huh wuh?
   export CFLAGS=-DHAVE_DVDCSS_DVDCSS_H
-  do_configure "--enable-cross-compile --host-cc=cc --cc=${cross_prefix}gcc --windres=${cross_prefix}windres --ranlib=${cross_prefix}ranlib --ar=${cross_prefix}ar --as=${cross_prefix}as --nm=${cross_prefix}nm --enable-runtime-cpudetection --extra-cflags=$CFLAGS --with-dvdnav-config=$mingw_w64_x86_64_prefix/bin/dvdnav-config --disable-dvdread-internal --disable-libdvdcss-internal --disable-w32threads --enable-pthreads --extra-libs=-lpthread --enable-debug" # haven't reported the ldvdcss thing, think it's to do with possibly it not using dvdread.pc [?] XXX check with trunk
+  do_configure "--host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix --enable-cross-compile --host-cc=cc --cc=${cross_prefix}gcc --windres=${cross_prefix}windres --ranlib=${cross_prefix}ranlib --ar=${cross_prefix}ar --as=${cross_prefix}as --nm=${cross_prefix}nm --enable-runtime-cpudetection --extra-cflags=$CFLAGS --with-dvdnav-config=$mingw_w64_x86_64_prefix/bin/dvdnav-config --disable-dvdread-internal --disable-libdvdcss-internal --disable-w32threads --enable-pthreads --extra-libs=-lpthread --enable-debug" # haven't reported the ldvdcss thing, think it's to do with possibly it not using dvdread.pc [?] XXX check with trunk
   unset LDFLAGS
   export CFLAGS=$original_cflags
   sed -i "s/HAVE_PTHREAD_CANCEL 0/HAVE_PTHREAD_CANCEL 1/g" config.h # mplayer doesn't set this up right?
-  # try to force re-link just in case...
+ # try to force re-link just in case...
   rm *.exe
   rm already_ran_make* # try to force re-link just in case...
   do_make
   cp mplayer.exe mplayer_debug.exe
   ${cross_prefix}strip mplayer.exe
   echo "built ${PWD}/{mplayer,mencoder,mplayer_debug}.exe"
+#  CPPFLAGS='-DFRIBIDI_ENTRY="" ' ./configure --prefix=$mingw_w64_x86_64_prefix --bindir=$mingw_w64_x86_64_prefix/bin --cc=gcc --extra-cflags='-DPTW32_STATIC_LIB -O3 -std=gnu99 -DLIBTWOLAME_STATIC -DAL_LIBTYPE_STATIC' --extra-libs='-lxml2 -llzma -lfreetype -lz -lbz2 -liconv -lws2_32 -lpthread -lwinpthread -lpng -ldvdcss -lOpenAL32 -lwinmm -lole32' --extra-ldflags='-Wl,--allow-multiple-definition' --enable-static --enable-openal --enable-runtime-cpudetection --enable-ass-internal --enable-bluray --disable-dvdread-internal --disable-libdvdcss-internal --disable-gif $faac
+		
+  make
+  make install
   cd ..
 }
 
@@ -1471,7 +1491,7 @@ build_dependencies() {
     build_faac # not included for now, too poor quality :)
     # build_libaacplus # if you use it, conflicts with other AAC encoders <sigh>, so disabled :)
   fi
-  # build_openssl # hopefully do not need it anymore, since we use gnutls everywhere, so just don't even build it...
+  build_openssl # hopefully do not need it anymore, since we use gnutls everywhere, so just don't even build it...
   build_librtmp # needs gnutls [or openssl...]
 }
 
@@ -1483,6 +1503,7 @@ build_apps() {
     build_libMXF
     build_libMXFpp
     build_bmx
+  #  build_makemkv
   fi
   if [[ $build_mp4box = "y" ]]; then
     build_mp4box
