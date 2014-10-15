@@ -1,7 +1,7 @@
 multimediaWin64
 ===============
 
-Scripts for building open-source multimedia utilities for Win64 from Cygwin. Includes FFmpeg, sox, MP4Box, raw2bmx, opusenc, lame, cdrtools, exiv2 and many others and their associated libraries. The compiled programs are native Windows 64-bit binaries, and do not require Cygwin libraries.
+Scripts for building open-source multimedia utilities for Win64 from Cygwin. Includes FFmpeg, sox, MP4Box, raw2bmx, opusenc, lame, mkisofs, libcdio, exiv2 and many others and their associated libraries. The compiled programs are native Windows 64-bit binaries, and do not require Cygwin libraries.
 
 
 BACKGROUND
