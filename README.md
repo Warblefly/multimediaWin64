@@ -32,14 +32,14 @@ I have tested neither other command lines nor other builds.
 THANKS
 ======
 
-Zeranoe and associated developers. http://zeranoe.com/
-The FFmpeg developers. http://ffmpeg.org
-The BBC developers behind Ingest and libMXF
-Videolan, programmers of x264
-The programmers of x265
-Creator of SoX. http://sox.sourceforge.net/
-Jörg Schilling, writer of cdrtools, smake and other programs
-All whose work is incorporated, and I hope I have preserved their licences.
+* Zeranoe and associated developers. http://zeranoe.com/
+* The FFmpeg developers. http://ffmpeg.org
+* The BBC developers behind Ingest and libMXF
+* Videolan, programmers of x264
+* The programmers of x265
+* Creator of SoX. http://sox.sourceforge.net/
+* Jörg Schilling, writer of cdrtools, smake and other programs
+* All whose work is incorporated, and I hope I have preserved their licences.
 
 
 LICENCE
