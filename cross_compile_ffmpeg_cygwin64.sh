@@ -262,14 +262,16 @@ do_configure() {
   if [ ! -f "$touch_name" ]; then
     make clean # just in case
     #make uninstall # does weird things when run under ffmpeg src
-    if [ -f bootstrap.sh ]; then
-      ./bootstrap.sh
-    fi
-    if [ -f autogen.sh ]; then
-      ./autogen.sh
-    fi
-    if [ -f autogen ]; then
-      ./autogen
+    if [ ! -f configure ]; then
+      if [ -f bootstrap.sh ]; then
+        ./bootstrap.sh
+      fi
+      if [ -f autogen.sh ]; then
+        ./autogen.sh
+      fi
+      if [ -f autogen ]; then
+        ./autogen
+      fi
     fi
     rm -f already_* # reset
     echo "configuring $english_name ($PWD) as $ PATH=$PATH $configure_name $configure_options"
@@ -297,6 +299,23 @@ do_make() {
   fi
 }
 
+do_smake() {
+  local extra_make_options="$1"
+  local cur_dir2=$(pwd)
+  local touch_name=$(get_small_touchfile_name already_ran_make "$extra_make_options")
+
+  if [ ! -f $touch_name ]; then
+    echo
+    echo "smaking $cur_dir2 as $ PATH=$PATH smake $extra_make_options"
+    echo
+    nice ${mingw_w64_x86_64_prefix}/../bin/smake.exe $extra_make_options || exit 1
+    touch $touch_name # only touch if the build was OK
+  else
+    echo "already did smake $(basename "$cur_dir2")"
+  fi
+}
+
+
 do_make_install() {
   local extra_make_options="$1"
   do_make "$extra_make_options"
@@ -307,6 +326,18 @@ do_make_install() {
     touch $touch_name
   fi
 }
+
+do_smake_install() {
+  local extra_make_options="$1"
+  do_smake "$extra_make_options"
+  local touch_name=$(get_small_touchfile_name already_ran_make_install "$extra_make_options")
+  if [ ! -f $touch_name ]; then
+    echo "smake installing $cur_dir2 as $ PATH=$PATH smake install $extra_make_options"
+    nice ${mingw_w64_x86_64_prefix}/../bin/smake.exe install $extra_make_options || exit 1
+    touch $touch_name
+  fi
+}
+
 
 do_cmake() {
   extra_args="$1" 
@@ -661,10 +692,10 @@ build_libgsm() {
 }
 
 build_libopus() {
-  download_and_unpack_file http://downloads.xiph.org/releases/opus/opus-1.1.tar.gz opus-1.1
-  cd opus-1.1
+  download_and_unpack_file http://downloads.xiph.org/releases/opus/opus-1.1.1-beta.tar.gz opus-1.1.1-beta
+  cd opus-1.1.1-beta
     apply_patch https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/opus11.patch # allow it to work with shared builds
-    generic_configure_make_install "--enable-custom-modes" 
+    generic_configure_make_install "--enable-custom-modes --enable-asm" 
   cd ..
 }
 
@@ -719,9 +750,8 @@ build_win32_pthreads() {
   cd ..
 }
 
-build_libdl() {
-  #download_and_unpack_file http://dlfcn-win32.googlecode.com/files/dlfcn-win32-r19.tar.bz2 dlfcn-win32-r19
-  do_svn_checkout http://dlfcn-win32.googlecode.com/svn/trunk/ dlfcn-win32
+build_libdlfcn() {
+  do_git_checkout https://github.com/dlfcn-win32/dlfcn-win32.git dlfcn-win32
   cd dlfcn-win32
     ./configure --disable-shared --enable-static --cross-prefix=$cross_prefix --prefix=$mingw_w64_x86_64_prefix
     do_make_install
@@ -785,8 +815,8 @@ build_libass() {
 }
 
 build_gmp() {
-  download_and_unpack_file ftp://ftp.gnu.org/gnu/gmp/gmp-5.1.3.tar.bz2 gmp-5.1.3
-  cd gmp-5.1.3
+  download_and_unpack_file https://gmplib.org/download/gmp/gmp-6.0.0a.tar.bz2 gmp-6.0.0
+  cd gmp-6.0.0
     export CC_FOR_BUILD=/usr/bin/gcc
     export CPP_FOR_BUILD=usr/bin/cpp
     generic_configure "ABI=$bits_target"
@@ -899,7 +929,7 @@ build_openssl() {
   export CC="${cross}gcc"
   export AR="${cross}ar"
   export RANLIB="${cross}ranlib"
-  XXXX do we need no-asm here?
+  #XXXX do we need no-asm here?
   if [ "$bits_target" = "32" ]; then
     do_configure "--prefix=$mingw_w64_x86_64_prefix no-shared no-asm mingw" ./Configure
   else
@@ -1050,6 +1080,14 @@ build_libtool() {
   generic_download_and_install http://ftpmirror.gnu.org/libtool/libtool-2.4.2.tar.gz libtool-2.4.2
 }
 
+build_exiv2() {
+  do_svn_checkout svn://dev.exiv2.org/svn/trunk exiv2
+  cd exiv2
+  cpu_count=1 # svn_version.h gets written too early otherwise
+  make config
+  generic_configure_make_install
+  cd ..
+}
 
 build_bmx() {
   do_git_checkout git://git.code.sf.net/p/bmxlib/bmx bmxlib-bmx
@@ -1169,6 +1207,37 @@ build_flac() {
   cd ..
 }
 
+# build_cdrecord() {
+#  download_and_unpack_bz2file http://downloads.sourceforge.net/project/cdrtools/alpha/cdrtools-3.01a25.tar.bz2 cdrtools-3.01
+#  cd cdrtools-3.01
+#  apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/cdrtools-3.01a25_mingw.patch
+#  do_smake "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
+#  do_smake_install "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
+#  cd .. 
+#}
+
+#build_smake() { # This enables build of cdrtools. Jorg Schilling uses his own make system called smake
+                # which first nust be compiled for the native Cygwin architecture. Mingw builds don't
+                # work for me
+#  download_and_unpack_bz2file http://downloads.sourceforge.net/project/s-make/smake-1.2.4.tar.bz2 smake-1.2.4
+#  cd smake-1.2.4
+#  make STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/..
+#  make install STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/..
+#  cd ..
+#}
+
+build_libcdio() {
+  do_git_checkout http://git.savannah.gnu.org/r/libcdio.git libcdio
+  cd libcdio
+  if [[ -f "configure" ]]; then
+    autoreconf -fvi
+  fi
+  touch ./doc/version.texi # Documentation isn't included but the Makefile still wants it
+  touch src/cd-drive.1 src/cd-info.1 src/cd-read.1 src/iso-info.1 src/iso-read.1
+  generic_configure_make_install "--disable-shared --enable-static"
+  cd ..  
+}
+
 build_makemkv() { # THIS IS NOT WORKING - MAKEMKV NEEDS MORE THAN MINGW OFFERS
   download_and_unpack http://www.makemkv.com/download/makemkv-oss-1.8.13.tar.gz makemkv-oss-1.8.13
   cd makemkv-oss-1.8.13
@@ -1210,7 +1279,7 @@ build_vlc() {
   echo "
 
 
-     created a file like ${PWD}/vlc-2.2.0-git/vlc.exe
+     icreated a file like ${PWD}/vlc-2.2.0-git/vlc.exe
 
 
 
@@ -1342,7 +1411,7 @@ build_ffmpeg() {
   local output_dir="ffmpeg_git"
 
   # FFmpeg + libav compatible options
-  local extra_configure_opts="--enable-libsoxr --enable-fontconfig --enable-libass --enable-libutvideo --enable-libbluray --enable-iconv --enable-libtwolame --extra-cflags=-DLIBTWOLAME_STATIC --enable-libzvbi --enable-libcaca --enable-libmodplug --extra-libs=-lstdc++ --enable-opengl --extra-libs=-lpng --enable-libvidstab --enable-libx265"
+  local extra_configure_opts="--enable-libsoxr --enable-fontconfig --enable-libass --enable-libutvideo --enable-libbluray --enable-iconv --enable-libtwolame --extra-cflags=-DLIBTWOLAME_STATIC --enable-libzvbi --enable-libcaca --enable-libmodplug --extra-libs=-lstdc++ --enable-opengl --extra-libs=-lpng --enable-libvidstab --enable-libx265 --logfile=/dev/stdout"
 
   if [[ $type = "libav" ]]; then
     # libav [ffmpeg fork]  has a few missing options?
@@ -1401,7 +1470,7 @@ build_ffmpeg() {
   # build ismindex.exe, too, just for fun 
   make tools/ismindex.exe
 
-  sed -i 's/-lavutil -lm.*/-lavutil -lm -lpthread/' "$PKG_CONFIG_PATH/libavutil.pc" # XXX patch ffmpeg
+  sed -i 's/-lavutil -lm.*/-lavutil -lm -lpthread/' "$PKG_CONFIG_PATH/libavutil.pc" # XXX patch ffmpeg itself
   sed -i 's/-lswresample -lm.*/-lswresample -lm -lsoxr/' "$PKG_CONFIG_PATH/libswresample.pc" # XXX patch ffmpeg
   echo "Done! You will find $bits_target bit $shared binaries in $(pwd)/{ffmpeg,ffprobe,ffplay,avconv,avprobe}*.exe"
   cd ..
@@ -1423,9 +1492,9 @@ find_all_build_exes() {
 
 build_dependencies() {
   echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" # debug
-  #build_win32_pthreads # vpx etc. depend on this--provided by the compiler build script now, so shouldn't have to build our own
+  build_win32_pthreads # vpx etc. depend on this--provided by the compiler build script now, so shouldn't have to build our own
   build_libtool
-  build_libdl # ffmpeg's frei0r implentation needs this
+  build_libdlfcn # ffmpeg's frei0r implentation needs this <sigh>
   build_zlib # rtmp depends on it [as well as ffmpeg's optional but handy --enable-zlib]
   build_bzlib2 # in case someone wants it [ffmpeg uses it]
   build_libpng # for openjpeg, needs zlib
@@ -1511,6 +1580,8 @@ build_apps() {
   if [[ $build_mplayer = "y" ]]; then
     build_mplayer
   fi
+  build_exiv2
+  build_libcdio
   if [[ $build_ffmpeg_shared = "y" ]]; then
     build_ffmpeg ffmpeg shared
   fi
