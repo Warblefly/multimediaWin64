@@ -644,13 +644,13 @@ build_libvpx() {
   cd ..
 }
 
-build_libutvideo() {
-  download_and_unpack_file https://github.com/downloads/rdp/FFmpeg/utvideo-11.1.1-src.zip utvideo-11.1.1
-  cd utvideo-11.1.1
-    apply_patch https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/utv.diff
-    do_make_install "CROSS_PREFIX=$cross_prefix DESTDIR=$mingw_w64_x86_64_prefix prefix=" # prefix= to avoid it adding an extra /usr/local to it yikes
-  cd ..
-}
+#build_libutvideo() {
+#  download_and_unpack_file http://umezawa.dyndns.info/archive/utvideo/utvideo-14.2.1-src.zip utvideo-14.2.1
+#  cd utvideo-14.2.1
+##    apply_patch https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/utv.diff
+#    do_make_install "CROSS_PREFIX=$cross_prefix DESTDIR=$mingw_w64_x86_64_prefix prefix=" # prefix= to avoid it adding an extra /usr/local to it yikes
+#  cd ..
+#}
 
 
 build_libilbc() {
@@ -1411,7 +1411,7 @@ build_ffmpeg() {
   local output_dir="ffmpeg_git"
 
   # FFmpeg + libav compatible options
-  local extra_configure_opts="--enable-libsoxr --enable-fontconfig --enable-libass --enable-libutvideo --enable-libbluray --enable-iconv --enable-libtwolame --extra-cflags=-DLIBTWOLAME_STATIC --enable-libzvbi --enable-libcaca --enable-libmodplug --extra-libs=-lstdc++ --enable-opengl --extra-libs=-lpng --enable-libvidstab --enable-libx265 --logfile=/dev/stdout"
+  local extra_configure_opts="--enable-libsoxr --enable-fontconfig --enable-libass --enable-libbluray --enable-iconv --enable-libtwolame --extra-cflags=-DLIBTWOLAME_STATIC --enable-libzvbi --enable-libcaca --enable-libmodplug --extra-libs=-lstdc++ --enable-opengl --extra-libs=-lpng --enable-libvidstab --enable-libx265 --logfile=/dev/stdout"
 
   if [[ $type = "libav" ]]; then
     # libav [ffmpeg fork]  has a few missing options?
@@ -1504,7 +1504,7 @@ build_dependencies() {
   build_gnutls # needs libnettle, can use iconv it appears
 
   build_frei0r
-  build_libutvideo
+#  build_libutvideo
   #build_libflite # too big for the ffmpeg distro...
   build_sdl # needed for ffplay to be created
   build_libopus
