@@ -24,7 +24,7 @@ yes_no_sel () {
 }
 
 check_missing_packages () {
-  local check_packages=('curl' 'pkg-config' 'make' 'git' 'svn' 'cmake' 'gcc' 'autoconf' 'libtool' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg')
+  local check_packages=('curl' 'pkg-config' 'make' 'git' 'svn' 'cmake' 'gcc' 'autoconf' 'libtool' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg' 'patch')
   for package in "${check_packages[@]}"; do
     type -P "$package" >/dev/null || missing_packages=("$package" "${missing_packages[@]}")
   done
@@ -136,12 +136,12 @@ install_cross_compiler() {
     pick_compiler_flavors
   fi
 #  curl https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/mingw-w64-build-3.5.8.local -O  || exit 1
-  curl http://zeranoe.com/scripts/mingw_w64_build/mingw-w64-build-3.6.2 -O || exit 1
-  chmod u+x mingw-w64-build-3.6.2
+  curl http://zeranoe.com/scripts/mingw_w64_build/mingw-w64-build-3.6.4 -O || exit 1
+  chmod u+x mingw-w64-build-3.6.4
   unset CFLAGS # don't want these for the compiler itself since it creates executables to run on the local box
   # pthreads version to avoid having to use cvs for it
   echo "building cross compile gcc [requires internet access]"
-  nice ./mingw-w64-build-3.6.2 --clean-build --disable-shared --default-configure --mingw-w64-ver=git --gcc-ver=4.9.1  --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --binutils-ver=git --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
+  nice ./mingw-w64-build-3.6.4 --clean-build --disable-shared --default-configure --mingw-w64-ver=git --gcc-ver=4.9.1  --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=snapshot --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
   export CFLAGS=$original_cflags # reset it
   if [ -d mingw-w64-x86_64 ]; then
     touch mingw-w64-x86_64/compiler.done
@@ -644,13 +644,14 @@ build_libvpx() {
   cd ..
 }
 
-#build_libutvideo() {
-#  download_and_unpack_file http://umezawa.dyndns.info/archive/utvideo/utvideo-14.2.1-src.zip utvideo-14.2.1
-#  cd utvideo-14.2.1
-##    apply_patch https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/utv.diff
-#    do_make_install "CROSS_PREFIX=$cross_prefix DESTDIR=$mingw_w64_x86_64_prefix prefix=" # prefix= to avoid it adding an extra /usr/local to it yikes
-#  cd ..
-#}
+build_libutvideo() {
+  download_and_unpack_file http://umezawa.dyndns.info/archive/utvideo/utvideo-12.2.1-src.zip utvideo-12.2.1
+  cd utvideo-12.2.1
+    apply_patch https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/utv.diff
+    sed -i "s|Format.o|DummyCodec.o|" GNUmakefile
+    do_make_install "CROSS_PREFIX=$cross_prefix DESTDIR=$mingw_w64_x86_64_prefix prefix=" # prefix= to avoid it adding an extra /usr/local to it yikes
+  cd ..
+}
 
 
 build_libilbc() {
@@ -1162,9 +1163,10 @@ build_frei0r() {
     # we rely on external dll's for this one, so only need the header to enable it, for now
     #cp include/frei0r.h $mingw_w64_x86_64_prefix/include
   #cd ..
-  if [[ ! -f "$mingw_w64_x86_64_prefix/include/frei0r.h" ]]; then
+#  if [[ ! -f "$mingw_w64_x86_64_prefix/include/frei0r.h" ]]; then
+# Force fetching frei0r.h because sometimes it changes and FFmpeg needs those changes
     curl https://raw.githubusercontent.com/rdp/frei0r/master/include/frei0r.h > $mingw_w64_x86_64_prefix/include/frei0r.h || exit 1
-  fi
+#  fi
 }
 
 build_vidstab() {
@@ -1411,7 +1413,7 @@ build_ffmpeg() {
   local output_dir="ffmpeg_git"
 
   # FFmpeg + libav compatible options
-  local extra_configure_opts="--enable-libsoxr --enable-fontconfig --enable-libass --enable-libbluray --enable-iconv --enable-libtwolame --extra-cflags=-DLIBTWOLAME_STATIC --enable-libzvbi --enable-libcaca --enable-libmodplug --extra-libs=-lstdc++ --enable-opengl --extra-libs=-lpng --enable-libvidstab --enable-libx265 --logfile=/dev/stdout"
+  local extra_configure_opts="--enable-libsoxr --enable-fontconfig --enable-libass --enable-libutvideo --enable-libbluray --enable-iconv --enable-libtwolame --extra-cflags=-DLIBTWOLAME_STATIC --enable-libzvbi --enable-libcaca --enable-libmodplug --extra-libs=-lstdc++ --enable-opengl --extra-libs=-lpng --enable-libvidstab --enable-libx265"
 
   if [[ $type = "libav" ]]; then
     # libav [ffmpeg fork]  has a few missing options?
@@ -1504,7 +1506,7 @@ build_dependencies() {
   build_gnutls # needs libnettle, can use iconv it appears
 
   build_frei0r
-#  build_libutvideo
+  build_libutvideo
   #build_libflite # too big for the ffmpeg distro...
   build_sdl # needed for ffplay to be created
   build_libopus
@@ -1713,7 +1715,7 @@ if [ -d "mingw-w64-x86_64" ]; then # they installed a 64-bit compiler
   cd ..
 fi
 
-echo "searching for all local exe's..."
+echo "searching for some local exes..."
 for file in $(find_all_build_exes); do
   echo "built $file"
 done
