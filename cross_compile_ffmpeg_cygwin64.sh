@@ -559,7 +559,7 @@ build_librtmp() {
   sed -i 's/-lrtmp -lz/-lrtmp -lwinmm -lz/' "$PKG_CONFIG_PATH/librtmp.pc"
   cd ..
    # TODO do_make here instead...
-   make SYS=mingw CRYPTO=GNUTLS OPT=-O2 CROSS_COMPILE=$cross_prefix SHARED=no LIB_GNUTLS="`pkg-config --libs gnutls` -lz" || exit 1
+   make SYS=mingw CRYPTO=GNUTLS OPT=-O2 CROSS_COMPILE=$cross_prefix SHARED=no LIB_GNUTLS="`pkg-config --libs gnuls` -lz" || exit 1
   cd ..
 
 }
@@ -851,8 +851,8 @@ build_libschroedinger() {
 }
 
 build_gnutls() {
-  download_and_unpack_file ftp://ftp.gnutls.org/gcrypt/gnutls/v3.2/gnutls-3.2.14.tar.xz gnutls-3.2.14
-  cd gnutls-3.2.14
+  download_and_unpack_file ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.9.tar.xz gnutls-3.3.9
+  cd gnutls-3.3.9
     generic_configure "--disable-cxx --disable-doc" # don't need the c++ version, in an effort to cut down on size... LODO test difference...
     do_make_install
   cd ..
@@ -1209,24 +1209,24 @@ build_flac() {
   cd ..
 }
 
-# build_cdrecord() {
-#  download_and_unpack_bz2file http://downloads.sourceforge.net/project/cdrtools/alpha/cdrtools-3.01a25.tar.bz2 cdrtools-3.01
-#  cd cdrtools-3.01
-#  apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/cdrtools-3.01a25_mingw.patch
-#  do_smake "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
-#  do_smake_install "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
-#  cd .. 
-#}
+ build_cdrecord() {
+  download_and_unpack_bz2file http://downloads.sourceforge.net/project/cdrtools/alpha/cdrtools-3.01a25.tar.bz2 cdrtools-3.01
+  cd cdrtools-3.01
+  apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/cdrtools-3.01a25_mingw.patch
+  do_smake "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
+  do_smake_install "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
+  cd .. 
+}
 
-#build_smake() { # This enables build of cdrtools. Jorg Schilling uses his own make system called smake
+build_smake() { # This enables build of cdrtools. Jorg Schilling uses his own make system called smake
                 # which first nust be compiled for the native Cygwin architecture. Mingw builds don't
                 # work for me
-#  download_and_unpack_bz2file http://downloads.sourceforge.net/project/s-make/smake-1.2.4.tar.bz2 smake-1.2.4
-#  cd smake-1.2.4
-#  make STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/..
-#  make install STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/..
-#  cd ..
-#}
+  download_and_unpack_bz2file http://downloads.sourceforge.net/project/s-make/smake-1.2.4.tar.bz2 smake-1.2.4
+  cd smake-1.2.4
+  make STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/..
+  make install STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/..
+  cd ..
+}
 
 build_libcdio() {
   do_git_checkout http://git.savannah.gnu.org/r/libcdio.git libcdio
@@ -1564,6 +1564,7 @@ build_dependencies() {
   fi
   build_openssl # hopefully do not need it anymore, since we use gnutls everywhere, so just don't even build it...
   build_librtmp # needs gnutls [or openssl...]
+  build_smake # This is going to be useful one day
 }
 
 build_apps() {
@@ -1583,6 +1584,7 @@ build_apps() {
     build_mplayer
   fi
   build_exiv2
+  build_cdrecord
   build_libcdio
   if [[ $build_ffmpeg_shared = "y" ]]; then
     build_ffmpeg ffmpeg shared
