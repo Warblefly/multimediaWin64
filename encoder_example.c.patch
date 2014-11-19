@@ -1,0 +1,17 @@
+--- encoder_example.c	2009-08-25 20:48:59.000000000 +0100
++++ encoder_example.new.c	2014-11-19 17:15:04.088898200 +0000
+@@ -51,14 +51,6 @@
+ /*supply missing headers and functions to Win32. going to hell, I know*/
+ #include <fcntl.h>
+ #include <io.h>
+-
+-static double rint(double x)
+-{
+-  if (x < 0.0)
+-    return (double)(int)(x - 0.5);
+-  else
+-    return (double)(int)(x + 0.5);
+-}
+ #endif
+ 
+ const char *optstring = "b:e:o:a:A:v:V:s:S:f:F:ck:d:z:\1\2\3\4";
