@@ -141,7 +141,9 @@ install_cross_compiler() {
   unset CFLAGS # don't want these for the compiler itself since it creates executables to run on the local box
   # pthreads version to avoid having to use cvs for it
   echo "building cross compile gcc [requires internet access]"
-  nice ./mingw-w64-build-3.6.4 --clean-build --disable-shared --default-configure --mingw-w64-ver=git --gcc-ver=4.9.1  --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=snapshot --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
+# Quick patch to update GCC to 4.9.2
+  sed -i "s/gcc_release_ver='4.9.1'/gcc_release_ver='4.9.2'/" mingw-w64-build-3.6.4
+  nice ./mingw-w64-build-3.6.4 --clean-build --disable-shared --default-configure --mingw-w64-ver=git --gcc-ver=4.9.2 --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=snapshot --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
   export CFLAGS=$original_cflags # reset it
   if [ -d mingw-w64-x86_64 ]; then
     touch mingw-w64-x86_64/compiler.done
@@ -621,7 +623,7 @@ build_libopenjpeg() {
     # export CFLAGS="$CFLAGS -DOPJ_STATIC" # see https://github.com/rdp/ffmpeg-windows-build-helpers/issues/37
     do_cmake "-DBUILD_CODEC:bool=off -DBUILD_TESTS:BOOL=OFF" 
     do_make_install
-    export CFLAGS=$original_cflags # reset it
+    # export CFLAGS=$original_cflags # reset it
   cd ..
 }
 
@@ -785,6 +787,9 @@ build_libtheora() {
   download_and_unpack_file http://downloads.xiph.org/releases/theora/libtheora-1.2.0alpha1.tar.gz libtheora-1.2.0alpha1
   cd libtheora-1.2.0alpha1
     download_config_files
+    cd examples
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/encoder_example.c.patch
+    cd ..
     generic_configure
     do_make_install
   cd ..
@@ -851,8 +856,8 @@ build_libschroedinger() {
 }
 
 build_gnutls() {
-  download_and_unpack_file ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.9.tar.xz gnutls-3.3.9
-  cd gnutls-3.3.9
+  download_and_unpack_file ftp://ftp.gnutls.org/gcrypt/gnutls/v3.2/gnutls-3.2.14.tar.xz gnutls-3.2.14
+  cd gnutls-3.2.14
     generic_configure "--disable-cxx --disable-doc" # don't need the c++ version, in an effort to cut down on size... LODO test difference...
     do_make_install
   cd ..
@@ -1213,8 +1218,10 @@ build_flac() {
   download_and_unpack_bz2file http://downloads.sourceforge.net/project/cdrtools/alpha/cdrtools-3.01a25.tar.bz2 cdrtools-3.01
   cd cdrtools-3.01
   apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/cdrtools-3.01a25_mingw.patch
-  do_smake "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
-  do_smake_install "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
+ do_smake "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
+ do_smake_install "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
+#  do_smake "STRIPFLAGS=-s INS_BASE=$mingw_w64_x86_64_prefix"
+#  do_smake_install "STRIPFLAGS=-s INS_BASE=$mingw_w64_x86_64_prefix"
   cd .. 
 }
 
@@ -1717,10 +1724,10 @@ if [ -d "mingw-w64-x86_64" ]; then # they installed a 64-bit compiler
   cd ..
 fi
 
-echo "searching for some local exes..."
-for file in $(find_all_build_exes); do
-  echo "built $file"
-done
+#echo "searching for some local exes..."
+#for file in $(find_all_build_exes); do
+#  echo "built $file"
+#done
 echo "done!"
 
 
