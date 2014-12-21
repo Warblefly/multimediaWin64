@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # set -x
 # ffmpeg windows cross compile helper/download script
-# Copyright (C) 2012 Roger Pack, the script is under the GPLv3, but output FFmpeg's aren't necessarily
+# Copyright (C) 2014 Roger Pack, the script is under the GPLv3, but output FFmpeg's aren't necessarily
+# with modifications by John Warburton john@johnwarburton.com
 
 yes_no_sel () {
   unset user_input
@@ -24,7 +25,7 @@ yes_no_sel () {
 }
 
 check_missing_packages () {
-  local check_packages=('curl' 'pkg-config' 'make' 'git' 'svn' 'cmake' 'gcc' 'autoconf' 'libtool' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg' 'patch')
+  local check_packages=('curl' 'pkg-config' 'make' 'git' 'svn' 'cmake' 'gcc' 'autoconf' 'libtool' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg' 'patch' 'pax')
   for package in "${check_packages[@]}"; do
     type -P "$package" >/dev/null || missing_packages=("$package" "${missing_packages[@]}")
   done
@@ -74,7 +75,7 @@ intro() {
   the sandbox directory, since it will have some hard coded paths in there.
   You can, of course, rebuild ffmpeg from within it, etc.
 EOL
-  if [[ $sandbox_ok != 'y' ]]; then
+  if [[ $sandbox_ok != 'y' && ! -d sandbox ]]; then
     yes_no_sel "Is ./sandbox ok (requires ~ 5GB space) [Y/n]?" "y"
     if [[ "$user_input" = "n" ]]; then
       exit 1
@@ -135,7 +136,9 @@ install_cross_compiler() {
   if [[ -z $build_choice ]]; then
     pick_compiler_flavors
   fi
-#  curl https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/mingw-w64-build-3.5.8.local -O  || exit 1
+  if [[ -f mingw-w64-build-3.6.4 ]]; then
+    rm mingw-w64-build-3.6.4 || exit 1
+  fi 
   curl http://zeranoe.com/scripts/mingw_w64_build/mingw-w64-build-3.6.4 -O || exit 1
   chmod u+x mingw-w64-build-3.6.4
   unset CFLAGS # don't want these for the compiler itself since it creates executables to run on the local box
@@ -143,7 +146,8 @@ install_cross_compiler() {
   echo "building cross compile gcc [requires internet access]"
 # Quick patch to update GCC to 4.9.2
   sed -i "s/gcc_release_ver='4.9.1'/gcc_release_ver='4.9.2'/" mingw-w64-build-3.6.4
-  nice ./mingw-w64-build-3.6.4 --clean-build --disable-shared --default-configure --mingw-w64-ver=git --gcc-ver=4.9.2 --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=snapshot --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
+  sed -i "s/mingw_w64_release_ver='3.2.0'/mingw_w64_release_ver='3.3.0'/" mingw-w64-build-3.6.4
+  nice ./mingw-w64-build-3.6.4 --clean-build --disable-shared --default-configure --mingw-w64-ver=3.3.0 --gcc-ver=4.9.2 --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=snapshot --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
   export CFLAGS=$original_cflags # reset it
   if [ -d mingw-w64-x86_64 ]; then
     touch mingw-w64-x86_64/compiler.done
@@ -201,7 +205,7 @@ do_git_checkout() {
   local desired_branch="$3"
   if [ ! -d $to_dir ]; then
     echo "Downloading (via git clone) $to_dir"
-    rm -rf $to_dir # just in case it was interrupted previously...
+    rm -rf $to_dir.tmp # just in case it was interrupted previously...
     # prevent partial checkouts by renaming it only after success
     git clone $repo_url $to_dir.tmp || exit 1
     mv $to_dir.tmp $to_dir
@@ -295,7 +299,7 @@ do_make() {
     echo "making $cur_dir2 as $ PATH=$PATH make $extra_make_options"
     echo
     nice make $extra_make_options || exit 1
-    touch $touch_name # only touch if the build was OK
+    touch $touch_name || exit 1 # only touch if the build was OK
   else
     echo "already did make $(basename "$cur_dir2")"
   fi
@@ -311,7 +315,7 @@ do_smake() {
     echo "smaking $cur_dir2 as $ PATH=$PATH smake $extra_make_options"
     echo
     nice ${mingw_w64_x86_64_prefix}/../bin/smake.exe $extra_make_options || exit 1
-    touch $touch_name # only touch if the build was OK
+    touch $touch_name || exit 1 # only touch if the build was OK
   else
     echo "already did smake $(basename "$cur_dir2")"
   fi
@@ -325,7 +329,7 @@ do_make_install() {
   if [ ! -f $touch_name ]; then
     echo "make installing $cur_dir2 as $ PATH=$PATH make install $extra_make_options"
     nice make install $extra_make_options || exit 1
-    touch $touch_name
+    touch $touch_name || exit 1
   fi
 }
 
@@ -336,7 +340,7 @@ do_smake_install() {
   if [ ! -f $touch_name ]; then
     echo "smake installing $cur_dir2 as $ PATH=$PATH smake install $extra_make_options"
     nice ${mingw_w64_x86_64_prefix}/../bin/smake.exe install $extra_make_options || exit 1
-    touch $touch_name
+    touch $touch_name || exit 1
   fi
 }
 
@@ -359,11 +363,14 @@ apply_patch() {
  local patch_name=$(basename $url)
  local patch_done_name="$patch_name.done"
  if [[ ! -e $patch_done_name ]]; then
+   if [[ -f $patch_name ]]; then
+    rm $patch_name || exit 1
+   fi
    curl $url -O || exit 1
    echo "applying patch $patch_name"
    cat $patch_name
    patch -p0 < "$patch_name" || exit 1
-   touch $patch_done_name
+   touch $patch_done_name || exit 1
    rm already_ran* # if it's a new patch, reset everything too, in case it's really really really new
  else
    echo "patch $patch_name already applied"
@@ -375,10 +382,13 @@ apply_patch_p1() {
  local patch_name=$(basename $url)
  local patch_done_name="$patch_name.done"
  if [[ ! -e $patch_done_name ]]; then
+   if [[ -f $patch_name ]]; then
+    rm $patch_name || exit 1
+   fi
    curl $url -O || exit 1
    echo "applying patch $patch_name"
    patch -p1 < "$patch_name" || exit 1
-   touch $patch_done_name
+   touch $patch_done_name || exit 1
    rm already_ran* # if it's a new patch, reset everything too, in case it's really really really new
  else
    echo "patch $patch_name already applied"
@@ -393,10 +403,13 @@ download_and_unpack_file() {
   output_dir="$2"
   if [ ! -f "$output_dir/unpacked.successfully" ]; then
     echo "downloading $url"
+    if [[ -f $output_name ]]; then
+      rm "$output_name" || exit 1
+    fi
     curl "$url" -O -L || exit 1
-    tar -xf "$output_name" || unzip $output_name || exit 1
+    tar -xf "$output_name" || unzip "$output_name" || exit 1
     touch "$output_dir/unpacked.successfully" || exit 1
-    rm "$output_name"
+    rm "$output_name" || exit 1
   fi
 }
 
@@ -406,11 +419,14 @@ download_and_unpack_bz2file() {
   output_dir="$2"
   if [ ! -f "$output_dir/unpacked.successfully" ]; then
     echo "downloading $url"
+    if [[ -f $output_name ]]; then
+      rm "$output_name" || exit 1
+    fi
     curl "$url" -O -L || exit 1
     mkdir $output_dir
     tar ixvf "$output_name" -C $output_dir --strip-components=1 || exit 1
     touch "$output_dir/unpacked.successfully" || exit 1
-    rm "$output_name"
+    rm "$output_name" || exit 1
   fi
 }
 
@@ -520,7 +536,7 @@ build_libx265() {
 build_libx264() {
   do_git_checkout "http://repo.or.cz/r/x264.git" "x264" "origin/stable"
   cd x264
-  local configure_flags="--host=$host_target --enable-static --cross-prefix=$cross_prefix --prefix=$mingw_w64_x86_64_prefix --extra-cflags=-DPTW32_STATIC_LIB --enable-debug" # --enable-win32thread --enable-debug shouldn't hurt us since ffmpeg strips it anyway I think
+  local configure_flags="--host=$host_target --enable-static --cross-prefix=$cross_prefix --prefix=$mingw_w64_x86_64_prefix --extra-cflags=-DPTW32_STATIC_LIB --disable-avs --disable-swscale --disable-lavf --disable-ffms --disable-gpac" # --enable-win32thread --enable-debug shouldn't hurt us since ffmpeg strips it anyway I think
   
   if [[ $high_bitdepth == "y" ]]; then
     configure_flags="$configure_flags --bit-depth=10" # Enable 10 bits (main10) per pixels profile.
@@ -972,8 +988,8 @@ build_iconv() {
 }
 
 build_freetype() {
-  download_and_unpack_file http://download.savannah.gnu.org/releases/freetype/freetype-2.5.3.tar.gz freetype-2.5.3
-  cd freetype-2.5.3
+  download_and_unpack_file http://download.savannah.gnu.org/releases/freetype/freetype-2.5.4.tar.gz freetype-2.5.4
+  cd freetype-2.5.4
   # Part of freetype's compilation process must be run as native, not cross compiled
   sed -i 's/$(CCraw_build)/gcc/' builds/unix/unix-cc.in
   generic_configure_make_install "--with-png=no"
@@ -1145,7 +1161,7 @@ build_libmodplug() {
 
 build_libcaca() {
   local cur_dir2=$(pwd)/libcaca-0.99.beta18
-  download_and_unpack_file http://caca.zoy.org/files/libcaca/libcaca-0.99.beta18.tar.gz libcaca-0.99.beta18
+  download_and_unpack_file ftp://ftp.netbsd.org/pub/pkgsrc/distfiles/libcaca-0.99.beta18.tar.gz libcaca-0.99.beta18
   cd libcaca-0.99.beta18
   cd caca
     sed -i "s/__declspec(dllexport)//g" *.h # get rid of the declspec lines otherwise the build will fail for undefined symbols
@@ -1352,19 +1368,6 @@ build_mp4box() { # like build_gpac
   cd ..
 }
 
-apply_ffmpeg_patch() {
- local url=$1
- local patch_name=$(basename $url)
- local patch_done_name="$patch_name.my_patch"
- if [[ ! -e $patch_done_name ]]; then
-   curl $url -O || exit 1
-   echo "applying patch $patch_name"
-   patch -p1 < "$patch_name" && touch $patch_done_name
-   git commit -a -m applied
- else
-   echo "patch $patch_name already applied"
- fi
-}
 
 build_libMXF() {
   #download_and_unpack_file http://sourceforge.net/projects/ingex/files/1.0.0/libMXF/libMXF-src-1.0.0.tgz "libMXF-src-1.0.0"
