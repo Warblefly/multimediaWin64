@@ -1,0 +1,21 @@
+--- configure.original  2015-02-14 10:21:03.614173700 +0000
++++ configure   2015-02-14 10:22:32.255918100 +0000
+@@ -13,7 +13,7 @@
+ ##
+
+ #source_path="`dirname \"$0\"`"
+-source_path=${0%/*}
++source_path="`pwd`"
+ . "${source_path}/build/make/configure.sh"
+
+ show_help(){
+@@ -179,7 +179,7 @@
+     die "Perl is required to build"
+ fi
+
+-
++source_path="`pwd`"
+ if [ "`cd \"${source_path}\" && pwd`" != "`pwd`" ]; then
+   # test to see if source_path already configured
+   if [ -f "${source_path}/vpx_config.h" ]; then
+
