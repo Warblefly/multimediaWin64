@@ -1290,17 +1290,17 @@ build_curl() {
 build_lua() {
   # Needed for mpv to use YouTube URLs. mpv looks for it in pkg-config path so might be
   # best to compile our own mingw version
-  download_and_unpack_file http://www.lua.org/ftp/lua-5.3.0.tar.gz lua-5.3.0
-  cd lua-5.3.0
-    apply_patch_p1 https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/lua-5.3.0-static-mingw.patch
+  download_and_unpack_file http://www.lua.org/ftp/lua-5.2.3.tar.gz lua-5.2.3
+  cd lua-5.2.3
+    apply_patch_p1 https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/lua-5.2.3-static-mingw.patch
     do_make "posix"
     do_make_install "posix"
   cd ..
   # mpv player (and possibly others) need to detect an lua.pc pkgconfig file
   # One must expand variables, and awk will do this.
 while read line; do eval echo \"$line\"; done > ${PKG_CONFIG_PATH}/lua.pc << "EOF"
-V=5.3
-R=5.3.0
+V=5.2
+R=5.2.3
 
 prefix=${mingw_w64_x86_64_prefix}
 INSTALL_BIN=${mingw_w64_x86_64_prefix}/bin
@@ -1315,7 +1315,7 @@ includedir=${mingw_w64_x86_64_prefix}/include
 
 Name: Lua
 Description: An Extensible Extension Language
-Version: 5.3.0
+Version: 5.2.3
 Requires: 
 Libs: -L${mingw_w64_x86_64_prefix}/lib -llua -lm
 Cflags: -I${mingw_w64_x86_64_prefix}/include
