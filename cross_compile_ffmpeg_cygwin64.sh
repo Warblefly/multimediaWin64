@@ -25,7 +25,7 @@ yes_no_sel () {
 }
 
 check_missing_packages () {
-  local check_packages=('curl' 'pkg-config' 'make' 'git' 'svn' 'cmake' 'gcc' 'autoconf' 'libtool' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg' 'patch' 'pax')
+  local check_packages=('curl' 'pkg-config' 'make' 'git' 'svn' 'cmake' 'gcc' 'autoconf' 'libtool' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg' 'patch' 'pax' 'bzr')
   for package in "${check_packages[@]}"; do
     type -P "$package" >/dev/null || missing_packages=("$package" "${missing_packages[@]}")
   done
@@ -269,7 +269,7 @@ do_configure() {
   if [ ! -f "$touch_name" ]; then
     make clean # just in case
     #make uninstall # does weird things when run under ffmpeg src
-    if [ ! -f configure ]; then
+    if [ ! -f ${configure_name} ]; then
       if [ -f bootstrap.sh ]; then
         ./bootstrap.sh
       fi
@@ -637,7 +637,7 @@ build_libopenjpeg() {
   download_and_unpack_file http://downloads.sourceforge.net/project/openjpeg.mirror/1.5.1/openjpeg-1.5.1.tar.gz openjpeg-1.5.1
   cd openjpeg-1.5.1
     # export CFLAGS="$CFLAGS -DOPJ_STATIC" # see https://github.com/rdp/ffmpeg-windows-build-helpers/issues/37
-    do_cmake "-DBUILD_CODEC:bool=off -DBUILD_TESTS:BOOL=OFF" 
+    do_cmake "-DBUILD_CODEC:bool=off -DBUILD_TESTS:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=OFF" 
     do_make_install
     # export CFLAGS=$original_cflags # reset it
   cd ..
@@ -651,6 +651,9 @@ build_libvpx() {
     do_git_checkout https://git.chromium.org/git/webm/libvpx.git "libvpx_git"
     cd libvpx_git
   fi
+  # This is to fix a bizarre Cygwin shell problem, introduced 13 Feb 2015, where the directory name in a shell
+  # expansion also seems to include the executable file name. This needs investigating.
+#  apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libvpx_configure.patch
   export CROSS="$cross_prefix"
   if [[ "$bits_target" = "32" ]]; then
     do_configure "--extra-cflags=-DPTW32_STATIC_LIB --target=x86-win32-gcc --prefix=$mingw_w64_x86_64_prefix --enable-static --disable-shared"
@@ -692,6 +695,18 @@ build_libcdio-paranoia() {
   cd ..
 }
 
+
+build_lsdvd() {
+  do_git_checkout git://git.code.sf.net/p/lsdvd/git lsdvd
+  cd lsdvd
+  if [[ ! -f "configure" ]]; then
+    autoreconf -fiv || exit 1 # failure here, OS X means "you need libtoolize" perhaps? http://betterlogic.com/roger/2014/12/ilbc-cross-compile-os-x-mac-woe/
+  fi
+  generic_configure_make_install
+  cd ..
+}
+
+
 build_libflite() {
   download_and_unpack_file http://www.speech.cs.cmu.edu/flite/packed/flite-1.4/flite-1.4-release.tar.bz2 flite-1.4-release
   cd flite-1.4-release
@@ -730,9 +745,9 @@ build_libopus() {
 
 build_libdvdread() {
   build_libdvdcss
-  download_and_unpack_file http://download.videolan.org/pub/videolan/libdvdread/5.0.0/libdvdread-5.0.0.tar.bz2 libdvdread-5.0.0
-  cd libdvdread-5.0.0
-  generic_configure "CFLAGS=-DHAVE_DVDCSS_DVDCSS_H LDFLAGS=-ldvdcss" # vlc patch: "--enable-libdvdcss" # XXX ask how I'm *supposed* to do this to the dvdread peeps [svn?]
+  download_and_unpack_file http://download.videolan.org/pub/videolan/libdvdread/5.0.2/libdvdread-5.0.2.tar.bz2 libdvdread-5.0.2
+  cd libdvdread-5.0.2
+  generic_configure "--with-libdvdcss CFLAGS=-DHAVE_DVDCSS_DVDCSS_H LDFLAGS=-ldvdcss" # vlc patch: "--enable-libdvdcss" # XXX ask how I'm *supposed* to do this to the dvdread peeps [svn?]
   #apply_patch https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/dvdread-win32.patch # has been reported to them...
   do_make_install 
   #sed -i "s/-ldvdread.*/-ldvdread -ldvdcss/" $mingw_w64_x86_64_prefix/bin/dvdread-config # ??? related to vlc patch, above, probably
@@ -741,8 +756,8 @@ build_libdvdread() {
 }
 
 build_libdvdnav() {
-  download_and_unpack_file http://download.videolan.org/pub/videolan/libdvdnav/5.0.1/libdvdnav-5.0.1.tar.bz2 libdvdnav-5.0.1
-  cd libdvdnav-5.0.1
+  download_and_unpack_file http://download.videolan.org/pub/videolan/libdvdnav/5.0.3/libdvdnav-5.0.3.tar.bz2 libdvdnav-5.0.3
+  cd libdvdnav-5.0.3
   if [[ ! -f ./configure ]]; then
     ./autogen.sh
   fi
@@ -752,7 +767,7 @@ build_libdvdnav() {
 }
 
 build_libdvdcss() {
-  generic_download_and_install http://download.videolan.org/pub/videolan/libdvdcss/1.3.0/libdvdcss-1.3.0.tar.bz2 libdvdcss-1.3.0
+  generic_download_and_install http://download.videolan.org/pub/videolan/libdvdcss/1.3.99/libdvdcss-1.3.99.tar.bz2 libdvdcss-1.3.99
 }
 
 build_ncurses() {
@@ -769,6 +784,17 @@ build_coreutils() {
 
 build_less() {
   generic_download_and_install http://greenwoodsoftware.com/less/less-471.tar.gz less-471
+}
+
+build_dvdbackup() {
+  bzr branch lp:dvdbackup
+  cd dvdbackup
+  if [[ ! -f "configure" ]]; then
+    autoreconf -fiv || exit 1 # failure here, OS X means "you need libtoolize" perhaps? http://betterlogic.com/roger/2014/12/ilbc-cross-compile-os-x-mac-woe/
+  fi
+  sed -i.bak 's/mkdir(targetname, 0777)/mkdir(targetname)/' src/main.c
+  generic_configure_make_install "LIBS=-ldvdcss"
+  cd ..
 }
 
 build_glew() { # opengl stuff, apparently [disabled...]
@@ -1047,6 +1073,25 @@ build_sdl() {
   rmdir temp
 }
 
+build_sdl2() {
+  # Building this for mpv but FIXME it always links libsdl(1) anyway. 
+  generic_download_and_install https://www.libsdl.org/release/SDL2-2.0.3.tar.gz SDL2-2.0.3
+}
+
+build_mpv() {
+  do_git_checkout https://github.com/mpv-player/mpv.git mpv
+  cd mpv
+    ./bootstrap.py
+    export DEST_OS=win32
+    export TARGET=x86_64-w64-mingw32
+    do_configure "configure --prefix=${mingw_w64_x86_64_prefix} --enable-win32-internal-pthreads --disable-x11 --disable-lcms2 --enable-static-build --enable-sdl1 --disable-sdl2 --disable-debug-build" "./waf"
+    ./waf build
+    ./waf install
+    unset DEST_OS
+    unset TARGET
+  cd ..
+}
+
 build_faac() {
   generic_download_and_install http://downloads.sourceforge.net/faac/faac-1.28.tar.gz faac-1.28 "--with-mp4v2=no"
 }
@@ -1239,7 +1284,42 @@ build_opustools() {
 }
 
 build_curl() {
-  generic_download_and_install http://curl.haxx.se/download/curl-7.40.0.tar.bz2 curl-7.40.0
+  generic_download_and_install http://curl.haxx.se/download/curl-7.40.0.tar.bz2 curl-7.40.0 "--with-winssl --enable-ipv6"
+}
+
+build_lua() {
+  # Needed for mpv to use YouTube URLs. mpv looks for it in pkg-config path so might be
+  # best to compile our own mingw version
+  download_and_unpack_file http://www.lua.org/ftp/lua-5.3.0.tar.gz lua-5.3.0
+  cd lua-5.3.0
+    apply_patch_p1 https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/lua-5.3.0-static-mingw.patch
+    do_make "posix"
+    do_make_install "posix"
+  cd ..
+  # mpv player (and possibly others) need to detect an lua.pc pkgconfig file
+  # One must expand variables, and awk will do this.
+while read line; do eval echo \"$line\"; done > ${PKG_CONFIG_PATH}/lua.pc << "EOF"
+V=5.3
+R=5.3.0
+
+prefix=${mingw_w64_x86_64_prefix}
+INSTALL_BIN=${mingw_w64_x86_64_prefix}/bin
+INSTALL_INC=${mingw_w64_x86_64_prefix}/include
+INSTALL_LIB=${mingw_w64_x86_64_prefix}/lib
+INSTALL_MAN=${mingw_w64_x86_64_prefix}/man/man1
+INSTALL_LMOD=${mingw_w64_x86_64_prefix}/share/lua/5.3
+INSTALL_CMOD=${mingw_w64_x86_64_prefix}/lib/lua/5.3
+exec_prefix=${mingw_w64_x86_64_prefix}
+libdir=${mingw_w64_x86_64_prefix}/lib
+includedir=${mingw_w64_x86_64_prefix}/include
+
+Name: Lua
+Description: An Extensible Extension Language
+Version: 5.3.0
+Requires: 
+Libs: -L${mingw_w64_x86_64_prefix}/lib -llua -lm
+Cflags: -I${mingw_w64_x86_64_prefix}/include
+EOF
 }
 
 build_sox() {
@@ -1254,7 +1334,7 @@ build_sox() {
 
 
 build_flac() {
-  do_git_checkout https://git.xiph.org/flac.git flac
+  do_git_checkout git://git.xiph.org/flac.git flac
   cd flac
   if [[ ! -f "configure" ]]; then
     ./autogen.sh
@@ -1264,7 +1344,7 @@ build_flac() {
 }
 
  build_cdrecord() {
-  download_and_unpack_bz2file http://downloads.sourceforge.net/project/cdrtools/alpha/cdrtools-3.01a25.tar.bz2 cdrtools-3.01
+  download_and_unpack_bz2file http://downloads.sourceforge.net/project/cdrtools/alpha/cdrtools-3.01a27.tar.bz2 cdrtools-3.01
   cd cdrtools-3.01
   apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/cdrtools-3.01a25_mingw.patch
  do_smake "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
@@ -1564,6 +1644,7 @@ build_dependencies() {
   build_libutvideo
   #build_libflite # too big for the ffmpeg distro...
   build_sdl # needed for ffplay to be created
+  build_sdl2
   build_libopus
   build_libopencore
   build_libogg
@@ -1622,6 +1703,7 @@ build_dependencies() {
   build_librtmp # needs gnutls [or openssl...]
   build_smake # This is going to be useful one day
   build_regex
+  build_lua
 #  build_ncurses
 }
 
@@ -1640,14 +1722,13 @@ build_apps() {
   if [[ $build_mp4box = "y" ]]; then
     build_mp4box
   fi
-  if [[ $build_mplayer = "y" ]]; then
-    build_mplayer
-  fi
   build_curl
   build_exiv2
   build_cdrecord
   build_libcdio
   build_libcdio-paranoia
+  build_lsdvd
+#  build_dvdbackup
   if [[ $build_ffmpeg_shared = "y" ]]; then
     build_ffmpeg ffmpeg shared
   fi
@@ -1657,6 +1738,7 @@ build_apps() {
   if [[ $build_libav = "y" ]]; then
     build_ffmpeg libav
   fi
+  build_mpv
   if [[ $build_vlc = "y" ]]; then
     build_vlc # NB requires ffmpeg static as well, at least once...so put this last :)
   fi
