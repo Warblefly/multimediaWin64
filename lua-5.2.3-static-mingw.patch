@@ -19,7 +19,7 @@ diff -ru lua-5.3.0/src/Makefile lua-5.3.0-fixed/src/Makefile
  
 -CC= gcc
 +CC= ../../../mingw-w64-x86_64/bin/x86_64-w64-mingw32-gcc.exe -std=gnu99
- CFLAGS= -O2 -Wall -Wextra -DLUA_COMPAT_5_2 $(SYSCFLAGS) $(MYCFLAGS)
+ CFLAGS= -O2 -Wall -DLUA_COMPAT_ALL $(SYSCFLAGS) $(MYCFLAGS)
  LDFLAGS= $(SYSLDFLAGS) $(MYLDFLAGS)
  LIBS= -lm $(SYSLIBS) $(MYLIBS)
  
