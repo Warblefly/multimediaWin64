@@ -618,6 +618,17 @@ build_libsoxr() {
   cd ..
 }
 
+build_opencv() {
+  do_git_checkout https://github.com/Itseez/opencv.git "opencv"
+  cd opencv
+  # This is only used for a couple of frei0r filters. Surely we can switch off more options than this?
+    do_cmake "-DWITH_IPP=OFF -DWITH_DSHOW=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_opencv_apps=ON -DBUILD_PERF_TESTS=OFF -DBUILD_TESTS=OFF -DBUILD_WITH_DEBUG_INFO=OFF"
+    do_make_install
+#    export OpenCV_DIR=`pwd`
+  cd ..
+  # This helps frei0r find opencv
+}
+
 build_libxavs() {
   do_svn_checkout https://svn.code.sf.net/p/xavs/code/trunk xavs
   cd xavs
@@ -885,7 +896,7 @@ build_libfribidi() {
 }
 
 build_libass() {
-  generic_download_and_install http://libass.googlecode.com/files/libass-0.10.2.tar.gz libass-0.10.2
+  generic_download_and_install https://github.com/libass/libass/releases/download/0.12.1/libass-0.12.1.tar.gz libass-0.12.1
   # fribidi, fontconfig, freetype throw them all in there for good measure, trying to help mplayer once though it didn't help [FFmpeg needed a change for fribidi here though I believe]
   sed -i.bak 's/-lass -lm/-lass -lfribidi -lfontconfig -lfreetype -lexpat -lm/' "$PKG_CONFIG_PATH/libass.pc"
 }
@@ -1257,9 +1268,11 @@ build_regex() {
 
 build_frei0r() {
   # theoretically we could get by with just copying a .h file in, but why not build them here anyway, just for fun? :)
-  download_and_unpack_file https://files.dyne.org/frei0r/releases/frei0r-plugins-1.4.tar.gz frei0r-plugins-1.4
-  cd frei0r-plugins-1.4
-    do_cmake "-DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON"
+  do_git_checkout git://git.dyne.org/frei0r.git frei0r
+  cd frei0r
+    echo "We begin with OpenCV_DIR set to ${OpenCV_DIR}"
+    # These are ALWAYS compiled as DLLs... there is no static library model in frei0r
+    do_cmake "-DOpenCV_DIR=${OpenCV_DIR}"
     do_make_install
   cd ..
 }
@@ -1639,7 +1652,6 @@ build_dependencies() {
   build_libnettle # needs gmp
   build_iconv # mplayer I think needs it for freetype [just it though], vlc also wants it.  looks like ffmpeg can use it too...not sure what for :)
   build_gnutls # needs libnettle, can use iconv it appears
-
   build_frei0r
   build_libutvideo
   #build_libflite # too big for the ffmpeg distro...
@@ -1704,7 +1716,7 @@ build_dependencies() {
   build_smake # This is going to be useful one day
   build_regex
   build_lua
-#  build_ncurses
+  #  build_ncurses
 }
 
 build_apps() {
@@ -1739,6 +1751,7 @@ build_apps() {
     build_ffmpeg libav
   fi
   build_mpv
+  build_opencv # We place it here because opencv has an interface to FFmpeg
   if [[ $build_vlc = "y" ]]; then
     build_vlc # NB requires ffmpeg static as well, at least once...so put this last :)
   fi
