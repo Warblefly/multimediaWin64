@@ -5,7 +5,7 @@
  /* Time-out enabled work-alikes */
 
 -#ifdef HAVE_ALARM
-+#ifdef HAVE_ALARM || ! defined(SIGALRM)
++#ifdef (HAVE_ALARM || ! defined(SIGALRM))
  /* time-out jump buffer */
  static jmp_buf timeout_expired;
 
@@ -14,7 +14,7 @@
  struct hostent *timeout_gethostbyname(const char *hostname, int timeout)
  {
 -#ifdef HAVE_ALARM
-+#ifdef HAVE_ALARM || ! defined(SIGALRM)
++#ifdef (HAVE_ALARM || ! defined(SIGALRM))
      struct hostent *he = NULL;
      struct sigaction action;
      struct sigaction old;
