@@ -273,6 +273,9 @@ do_configure() {
       if [ -f bootstrap.sh ]; then
         ./bootstrap.sh
       fi
+      if [ -f bootstrap ]; then
+        ./bootstrap
+      fi
       if [ -f autogen.sh ]; then
         ./autogen.sh
       fi
@@ -624,7 +627,8 @@ build_opencv() {
   # This is only used for a couple of frei0r filters. Surely we can switch off more options than this?
     do_cmake "-DWITH_IPP=OFF -DWITH_DSHOW=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_opencv_apps=ON -DBUILD_PERF_TESTS=OFF -DBUILD_TESTS=OFF -DBUILD_WITH_DEBUG_INFO=OFF"
     do_make_install
-#    export OpenCV_DIR=`pwd`
+  export OpenCV_DIR=`pwd`
+  export OpenCV_INCLUDE_DIR="${OpenCV_DIR}/include"
   cd ..
   # This helps frei0r find opencv
 }
@@ -640,8 +644,13 @@ build_libxavs() {
 }
 
 build_libpng() {
-  generic_download_and_install http://download.sourceforge.net/libpng/libpng-1.5.18.tar.xz libpng-1.5.18
-}
+  download_and_unpack_file http://download.sourceforge.net/libpng/libpng-1.6.16.tar.xz libpng-1.6.16
+  cd libpng-1.6.16
+    # DBL_EPSILON 21 Feb 2015 starts to come back "undefined". I have NO IDEA why.
+    grep -lr DBL_EPSILON contrib | xargs sed -i "s| DBL_EPSILON| 2.2204460492503131E-16|g"
+    generic_configure_make_install
+  cd ..
+}  
 
 build_libopenjpeg() {
   # does openjpeg 2.0 work with ffmpeg? possibly not yet...
@@ -864,15 +873,16 @@ build_libspeex() {
 
 build_libtheora() {
   cpu_count=1 # can't handle it
-  download_and_unpack_file http://downloads.xiph.org/releases/theora/libtheora-1.2.0alpha1.tar.gz libtheora-1.2.0alpha1
-  cd libtheora-1.2.0alpha1
-    download_config_files
-    cd examples
-    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/encoder_example.c.patch
+#  download_and_unpack_file http://downloads.xiph.org/releases/theora/libtheora-1.2.0alpha1.tar.gz libtheora-1.2.0alpha1
+#  cd libtheora-1.2.0alpha1
+#    download_config_files
+#    cd examples
+#    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/encoder_example.c.patch
+#    cd ..
+    do_svn_checkout http://svn.xiph.org/trunk/theora theora
+    cd theora
+      generic_configure_make_install
     cd ..
-    generic_configure
-    do_make_install
-  cd ..
   #generic_download_and_install http://downloads.xiph.org/releases/theora/libtheora-1.2.0alpha1.tar.gz libtheora-1.2.0alpha1
   cpu_count=$original_cpu_count
 }
@@ -904,11 +914,11 @@ build_libass() {
 build_gmp() {
   download_and_unpack_file https://gmplib.org/download/gmp/gmp-6.0.0a.tar.bz2 gmp-6.0.0
   cd gmp-6.0.0
-    export CC_FOR_BUILD=/usr/bin/gcc
-    export CPP_FOR_BUILD=usr/bin/cpp
+#    export CC_FOR_BUILD=/usr/bin/gcc
+#    export CPP_FOR_BUILD=usr/bin/cpp
     generic_configure "ABI=$bits_target"
-    unset CC_FOR_BUILD
-    unset CPP_FOR_BUILD
+#    unset CC_FOR_BUILD
+#    unset CPP_FOR_BUILD
     do_make_install
   cd .. 
 }
@@ -937,8 +947,8 @@ build_libschroedinger() {
 }
 
 build_gnutls() {
-  download_and_unpack_file ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.9.tar.xz gnutls-3.3.9
-  cd gnutls-3.3.9
+  download_and_unpack_file ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.12.tar.xz gnutls-3.3.12
+  cd gnutls-3.3.12
     generic_configure "--disable-cxx --disable-doc" # don't need the c++ version, in an effort to cut down on size... XXXX test difference...
     do_make_install
   cd ..
@@ -1050,29 +1060,67 @@ build_libexpat() {
 
 build_iconv() {
   generic_download_and_install http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz libiconv-1.14
+  # We also need an empty langinfo.h to compile this
+  touch $cur_dir/include/langinfo.h
+}
+
+build_libgpg-error() {
+  # We remove one of the .po files due to a bug in Cygwin's iconv that causes it to loop when converting certain character encodings
+  download_and_unpack_file ftp://ftp.gnupg.org/gcrypt/libgpg-error/libgpg-error-1.18.tar.bz2 libgpg-error-1.18
+  cd libgpg-error-1.18
+    rm po/ro.* # The Romanian translation causes Cygwin's iconv to loop. This is a Cygwin bug.
+    generic_configure_make_install "--prefix=${mingw_compiler_path/}" # This is so gpg-error-config can be seen by other programs
+  cd ..
+}
+
+build_libgcrypt() {
+  generic_download_and_install ftp://ftp.gnupg.org/gcrypt/libgcrypt/libgcrypt-1.6.2.tar.gz libgcrypt-1.6.2 "--disable-asm"
 }
 
 build_freetype() {
-  download_and_unpack_file http://download.savannah.gnu.org/releases/freetype/freetype-2.5.4.tar.gz freetype-2.5.4
-  cd freetype-2.5.4
-  # Part of freetype's compilation process must be run as native, not cross compiled
-  sed -i.bak 's/$(CCraw_build)/gcc/' builds/unix/unix-cc.in
-  generic_configure_make_install "--with-png=no"
+  download_and_unpack_file http://download.savannah.gnu.org/releases/freetype/freetype-2.5.5.tar.bz2 freetype-2.5.5
+  cd freetype-2.5.5
+  generic_configure "--with-png=no --host=x86_64-w64-mingw32 --build=x86_64-pc-cygwin"
+#  cd src/tools
+#    "/usr/bin/gcc -v apinames.c -o apinames.exe"
+#    cp apinames.exe ../../objs
+#  cd ../..
+  do_make_install
+#  export cpu_count=$original_cpu_count
   cd ..
   #generic_download_and_install http://download.savannah.gnu.org/releases/freetype/freetype-2.5.3.tar.gz freetype-2.5.3 "--with-png=no"
   sed -i.bak 's/Libs: -L${libdir} -lfreetype.*/Libs: -L${libdir} -lfreetype -lexpat -lz -lbz2/' "$PKG_CONFIG_PATH/freetype2.pc" # this should not need expat, but...I think maybe people use fontconfig's wrong and that needs expat? huh wuh? or dependencies are setup wrong in some .pc file?
   # possibly don't need the bz2 in there [bluray adds its own]...
+#  export CFLAGS=${original_cflags}
 }
 
 build_vo_aacenc() {
   generic_download_and_install http://sourceforge.net/projects/opencore-amr/files/vo-aacenc/vo-aacenc-0.1.3.tar.gz/download vo-aacenc-0.1.3
 }
 
+build_libcddb() {
+  download_and_unpack_file http://sourceforge.net/projects/libcddb/files/latest/download libcddb-1.3.2
+  cd libcddb-1.3.2
+    apply_patch_p1 https://raw.githubusercontent.com/Alexpux/MINGW-packages/master/mingw-w64-libcddb/0001-include-winsock2-before-windows.mingw.patch
+    apply_patch_p1 https://raw.githubusercontent.com/Alexpux/MINGW-packages/master/mingw-w64-libcddb/0002-fix-header-conflict.mingw.patch
+    apply_patch_p1 https://raw.githubusercontent.com/Alexpux/MINGW-packages/master/mingw-w64-libcddb/0003-silent-rules.mingw.patch
+    apply_patch_p1 https://raw.githubusercontent.com/Alexpux/MINGW-packages/master/mingw-w64-libcddb/0004-hack-around-dummy-alarm.mingw.patch
+    apply_patch_p1 https://raw.githubusercontent.com/Alexpux/MINGW-packages/master/mingw-w64-libcddb/0005-fix-m4-dir.all.patch
+    apply_patch_p1 https://raw.githubusercontent.com/Alexpux/MINGW-packages/master/mingw-w64-libcddb/0006-update-gettext-req.mingw.patch
+    apply_patch_p1 https://raw.githubusercontent.com/Alexpux/MINGW-packages/master/mingw-w64-libcddb/0007-link-to-libiconv-properly.mingw.patch
+    cd lib
+      apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/cddb-1.3.2-lib-cddb_net.c.patch
+    cd ..
+    generic_configure_make_install
+  cd ..
+}
+
 build_sdl() {
   # apparently ffmpeg expects prefix-sdl-config not sdl-config that they give us, so rename...
+  hold_cflags="${CFLAGS}"
   export CFLAGS=-DDECLSPEC=  # avoid SDL trac tickets 939 and 282, not worried about optimizing yet
   generic_download_and_install http://www.libsdl.org/release/SDL-1.2.15.tar.gz SDL-1.2.15
-  export CFLAGS=$original_cflags # and reset it
+  export CFLAGS="${hold_cflags}" # and reset it
   mkdir temp
   cd temp # so paths will work out right
   local prefix=$(basename $cross_prefix)
@@ -1086,7 +1134,12 @@ build_sdl() {
 
 build_sdl2() {
   # Building this for mpv but FIXME it always links libsdl(1) anyway. 
-  generic_download_and_install https://www.libsdl.org/release/SDL2-2.0.3.tar.gz SDL2-2.0.3
+  download_and_unpack_file https://www.libsdl.org/release/SDL2-2.0.3.tar.gz SDL2-2.0.3
+  cd SDL2-2.0.3
+    # DBL_EPSILON 21 Feb 2015 starts to come back "undefined". I have NO IDEA why.
+    grep -lr DBL_EPSILON src | xargs sed -i "s| DBL_EPSILON| 2.2204460492503131E-16|g"
+    generic_configure_make_install
+  cd ..
 }
 
 build_mpv() {
@@ -1119,6 +1172,8 @@ build_lame() {
   # generic_download_and_install http://sourceforge.net/projects/lame/files/lame/3.99/lame-3.99.5.tar.gz/download lame-3.99.5
   do_git_checkout https://github.com/rbrito/lame.git lame
   cd lame
+  # For some reason, the definition of DBL_EPSILON has vanished
+  grep -lr DBL_EPSILON libmp3lame | xargs sed -i "s|xmin, DBL_EPSILON|xmin, rh2|g"
   generic_configure_make_install
   cd ..
 }
@@ -1266,13 +1321,44 @@ build_regex() {
   generic_download_and_install "http://mingw.cvs.sourceforge.net/viewvc/mingw/regex/?view=tar" regex
 }
 
+build_gavl() {
+  do_svn_checkout svn://svn.code.sf.net/p/gmerlin/code/trunk/gavl gavl
+  cd gavl
+    generic_configure_make_install "--enable-shared=yes"
+  cd ..
+}
+
+#build_cygwin() {
+# Need code to automatically discover most recent snapshot
+#  do_git_checkout https://github.com/mirror/cygwin.git cygwin || exit 1
+#  cvs -z 4 -d :pserver:anoncvs:anoncvs@cygwin.com/cvs/src checkout cygwin
+#  cvs -z 4 -d :pserver:anoncvs:anoncvs@cygwin.com/cvs/src checkout newlib
+#  download_and_unpack_file ftp://sourceware.org/pub/newlib/newlib-2.2.0.20150225.tar.gz newlib-2.2.0.20150225 || exit 1
+#  cd src
+#   ln -s ../newlib-2.2.0.20150225/newlib newlib
+    # This is going to be a Cygwin-native build, so use the normal Cygwin C compiler
+#    export holding_path="${PATH}"
+#    export PATH="/usr/bin:/bin:${mingw_compiler_path}/bin"
+#    echo "PATH IS ${PATH}"
+#      mkdir build
+#      cd build
+#        export cpu_count=1
+#        do_configure "--prefix=${mingw_w64_x86_64_prefix}/x86_64_pc_cygwin --enable-shared=yes" "../configure"
+#        do_make 
+#        do_make_install
+#        export cpu_count=$original_cpu_count
+#    cd ../..
+#    export PATH="${holding_path}"
+#}
+
 build_frei0r() {
-  # theoretically we could get by with just copying a .h file in, but why not build them here anyway, just for fun? :)
   do_git_checkout git://git.dyne.org/frei0r.git frei0r
   cd frei0r
-    echo "We begin with OpenCV_DIR set to ${OpenCV_DIR}"
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/frei0r-lightgraffiti.cpp.patch
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/frei0r-vignette.cpp.patch
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/frei0r-partik0l.cpp.patch
     # These are ALWAYS compiled as DLLs... there is no static library model in frei0r
-    do_cmake "-DOpenCV_DIR=${OpenCV_DIR}"
+    do_cmake "-DOpenCV_DIR=${OpenCV_DIR} -DOpenCV_INCLUDE_DIR=${OpenCV_INCLUDE_DIR} -DCMAKE_CXX_FLAGS=-std=c++14"
     do_make_install
   cd ..
 }
@@ -1356,26 +1442,32 @@ build_flac() {
   cd ..
 }
 
- build_cdrecord() {
-  download_and_unpack_bz2file http://downloads.sourceforge.net/project/cdrtools/alpha/cdrtools-3.01a27.tar.bz2 cdrtools-3.01
-  cd cdrtools-3.01
-  apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/cdrtools-3.01a25_mingw.patch
- do_smake "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
- do_smake_install "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
-#  do_smake "STRIPFLAGS=-s INS_BASE=$mingw_w64_x86_64_prefix"
-#  do_smake_install "STRIPFLAGS=-s INS_BASE=$mingw_w64_x86_64_prefix"
-  cd .. 
-}
+# build_cdrecord() {
+#  download_and_unpack_bz2file http://downloads.sourceforge.net/project/cdrtools/alpha/cdrtools-3.01a27.tar.bz2 cdrtools-3.01
+#  cd cdrtools-3.01
+#    export holding_path="${PATH}"
+#    export PATH="/usr/bin:/bin:${mingw_compiler_path}/bin"
+#  apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/cdrtools-3.01a25_mingw.patch
+# do_smake "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
+# do_smake_install "STRIPFLAGS=-s K_ARCH=i386 M_ARCH=i386 P_ARCH=i386 ARCH=i386 OSNAME=mingw32_nt-6.2 CC=${cross_prefix}gcc.exe INS_BASE=$mingw_w64_x86_64_prefix"
+#    do_smake "STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/x86_64_pc_cygwin"
+#    do_smake_install "STRIPFLAGS=-s ${mingw_w64_x86_64_prefix}/x86_64_pc_cygwin"
+#  cd .. 
+#  export PATH="${holding_path}"
+#}
 
-build_smake() { # This enables build of cdrtools. Jorg Schilling uses his own make system called smake
+#build_smake() { # This enables build of cdrtools. Jorg Schilling uses his own make system called smake
                 # which first nust be compiled for the native Cygwin architecture. Mingw builds don't
                 # work for me
-  download_and_unpack_bz2file http://downloads.sourceforge.net/project/s-make/smake-1.2.4.tar.bz2 smake-1.2.4
-  cd smake-1.2.4
-  make STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/..
-  make install STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/..
-  cd ..
-}
+#  download_and_unpack_bz2file http://downloads.sourceforge.net/project/s-make/smake-1.2.4.tar.bz2 smake-1.2.4
+#  cd smake-1.2.4
+#  orig_path=$PATH
+#  export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+#  /usr/bin/make STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/.. || exit 1
+#  /usr/bin/make install STRIPFLAGS=-s INS_BASE=${mingw_w64_x86_64_prefix}/.. || exit 1
+#  export PATH="${orig_path}"
+#  cd ..
+#}
 
 build_libcdio() {
   do_git_checkout http://git.savannah.gnu.org/r/libcdio.git libcdio
@@ -1644,15 +1736,19 @@ build_dependencies() {
   echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" # debug
   build_win32_pthreads # vpx etc. depend on this--provided by the compiler build script now, so shouldn't have to build our own
   build_libtool
+  build_iconv # Because Cygwin's iconv is buggy, and loops on certain character set conversions
   build_libdlfcn # ffmpeg's frei0r implentation needs this <sigh>
   build_zlib # rtmp depends on it [as well as ffmpeg's optional but handy --enable-zlib]
   build_bzlib2 # in case someone wants it [ffmpeg uses it]
   build_libpng # for openjpeg, needs zlib
   build_gmp # for libnettle
   build_libnettle # needs gmp
-  build_iconv # mplayer I think needs it for freetype [just it though], vlc also wants it.  looks like ffmpeg can use it too...not sure what for :)
+#  build_iconv # mplayer I think needs it for freetype [just it though], vlc also wants it.  looks like ffmpeg can use it too...not sure what for :)
   build_gnutls # needs libnettle, can use iconv it appears
+  #build_opencv
+  build_gavl # Frei0r has this as an optional dependency
   build_frei0r
+  build_opencv
   build_libutvideo
   #build_libflite # too big for the ffmpeg distro...
   build_sdl # needed for ffplay to be created
@@ -1666,9 +1762,12 @@ build_dependencies() {
   build_libtheora # needs libvorbis, libogg
   build_orc
   build_libschroedinger # needs orc
+  echo "Now ready to build freetype"
   build_freetype # uses bz2/zlib seemingly
   build_libexpat
   build_libxml2
+  build_libgpg-error
+  build_libgcrypt
   build_libbluray # needs libxml2, freetype [FFmpeg, VLC use this, at least]
   build_libjpeg_turbo # mplayer can use this, VLC qt might need it? [replaces libjpeg]
   build_libdvdcss
@@ -1684,6 +1783,7 @@ build_dependencies() {
   build_libcaca
   build_libmodplug # ffmepg and vlc can use this
   build_zvbi
+  build_libcddb
   build_libvpx
   build_vo_aacenc
   build_libdecklink
@@ -1713,9 +1813,10 @@ build_dependencies() {
   fi
   # build_openssl # hopefully do not need it anymore, since we use gnutls everywhere, so just don't even build it anymore
   build_librtmp # needs gnutls [or openssl...]
-  build_smake # This is going to be useful one day
+#  build_smake # This is going to be useful one day
   build_regex
   build_lua
+#  build_cygwin
   #  build_ncurses
 }
 
@@ -1736,7 +1837,7 @@ build_apps() {
   fi
   build_curl
   build_exiv2
-  build_cdrecord
+#  build_cdrecord # NOTE: just now, cdrecord doesn't work on 64-bit mingw. It scans the emulated SCSI bus but no more.
   build_libcdio
   build_libcdio-paranoia
   build_lsdvd
@@ -1751,7 +1852,7 @@ build_apps() {
     build_ffmpeg libav
   fi
   build_mpv
-  build_opencv # We place it here because opencv has an interface to FFmpeg
+  # build_opencv # We place it here because opencv has an interface to FFmpeg
   if [[ $build_vlc = "y" ]]; then
     build_vlc # NB requires ffmpeg static as well, at least once...so put this last :)
   fi
@@ -1844,6 +1945,7 @@ install_cross_compiler
 
 export PKG_CONFIG_LIBDIR= # disable pkg-config from reverting back to and finding system installed packages [yikes]
 
+
 original_path="$PATH"
 if [ -d "mingw-w64-i686" ]; then # they installed a 32-bit compiler
   echo "Building 32-bit ffmpeg..."
@@ -1866,9 +1968,12 @@ if [ -d "mingw-w64-x86_64" ]; then # they installed a 64-bit compiler
   mingw_w64_x86_64_prefix="$cur_dir/mingw-w64-x86_64/$host_target"
   export PATH="$cur_dir/mingw-w64-x86_64/bin:$original_path"
   export PKG_CONFIG_PATH="$cur_dir/mingw-w64-x86_64/x86_64-w64-mingw32/lib/pkgconfig"
+  export mingw_compiler_path="$cur_dir/mingw-w64-x86_64"
   mkdir -p x86_64
   bits_target=64
   cross_prefix="$cur_dir/mingw-w64-x86_64/bin/x86_64-w64-mingw32-"
+  # Make a link to system pkg-config program because some compiles look for it as a cross-compiler version of pkg-config
+  ln -s /usr/bin/pkg-config ${cross_prefix}pkg-config.exe
   cd x86_64
   build_dependencies
   build_apps
