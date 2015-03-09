@@ -1,14 +1,14 @@
---- security.c.orig     2015-03-09 09:14:30.845291900 +0000
-+++ security.c  2015-03-09 09:15:22.873270300 +0000
+--- security.c.orig	2015-03-09 09:25:59.928440000 +0000
++++ security.c	2015-03-09 09:26:29.034615100 +0000
 @@ -343,7 +343,11 @@
-            }
-            ret = xsltCheckWritePath(sec, ctxt, directory);
-            if (ret == 1)
+ 	    }
+ 	    ret = xsltCheckWritePath(sec, ctxt, directory);
+ 	    if (ret == 1)
 +#ifdef WIN32
-+               ret = mkdir(directory);
++		ret = mkdir(directory);
 +#else
-                ret = mkdir(directory, 0755);
+ 		ret = mkdir(directory, 0755);
 +#endif
-        }
-        xmlFree(directory);
-        if (ret < 0)
+ 	}
+ 	xmlFree(directory);
+ 	if (ret < 0)
