@@ -1,5 +1,5 @@
---- libxslt/security.c.orig     2010-10-13 15:42:00.790273503 +0200
-+++ libxslt/security.c  2010-10-13 15:42:34.425556664 +0200
+--- security.c.orig     2015-03-09 09:14:30.845291900 +0000
++++ security.c  2015-03-09 09:15:22.873270300 +0000
 @@ -343,7 +343,11 @@
             }
             ret = xsltCheckWritePath(sec, ctxt, directory);
