@@ -20,7 +20,6 @@
 +INCLUDE_DIRECTORIES(${SYSROOT_PATH}/include/openjpeg-2.1)
  
  SET(LIBS ${LIBS} ${LIB_DIR_SYS}/libtiff.a ${LIB_DIR_SYS}/libjpeg.a)
- SET(LIBS ${LIBS} -L${LIB_DIR_SYS} -lcrypto -lssl)
 @@ -46,7 +46,7 @@
      SET(MING mingw32)
  ENDIF()
