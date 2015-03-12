@@ -17,7 +17,6 @@
 -SET(LIBS ${LIBS} ${LIB_DIR}/libopenjp2.a)
 +SET(COMPILE_OPENJPEG 0)
 +SET(LIBS ${LIBS} ${LIB_DIR_SYS}/libopenjp2.a)
-+INCLUDE_DIRECTORIES(${SYSROOT_PATH}/include/openjpeg-2.1)
  
  SET(LIBS ${LIBS} ${LIB_DIR_SYS}/libtiff.a ${LIB_DIR_SYS}/libjpeg.a)
  SET(LIBS ${LIBS} -L${LIB_DIR_SYS} -lcrypto -lssl)
