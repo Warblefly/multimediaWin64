@@ -1,0 +1,11 @@
+--- toolchains/win32.cmake.orig	2015-03-12 17:55:51.578597900 +0000
++++ toolchains/win32.cmake	2015-03-12 17:56:33.500123500 +0000
+@@ -21,7 +21,7 @@
+ IF(ENABLE_XMLSEC)
+     INCLUDE_DIRECTORIES(${SYSROOT_PATH}/include/libxslt)
+     INCLUDE_DIRECTORIES(${SYSROOT_PATH}/include/xmlsec1)
+-    SET(COMPILE_XMLSEC 1)
++#    SET(COMPILE_XMLSEC 1)
+     SET(LIBS ${LIBS} ${LIB_DIR_SYS}/libxmlsec1-openssl.a ${LIB_DIR_SYS}/libxmlsec1.a)
+     SET(LIBS ${LIBS} -L${LIB_DIR_SYS} -lxslt)
+ ENDIF(ENABLE_XMLSEC)
