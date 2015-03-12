@@ -4,7 +4,7 @@
  SET(LIBS ${LIBS} ${LIB_DIR_SYS}/libtiff.a ${LIB_DIR_SYS}/libjpeg.a)
  SET(LIBS ${LIBS} -L${LIB_DIR_SYS} -lcrypto -lssl)
  SET(LIBS ${LIBS} -L${LIB_DIR_SYS} -lz -lws2_32)
-+SET(LIBS $(LIBS} -L${LIB_DIR_SYS} -lltdl -liconv)
++SET(LIBS ${LIBS} -L${LIB_DIR_SYS} -lltdl -liconv)
  #-------------------------------------------------------------------------------
  
  IF(TARGET_ARCH STREQUAL x86_64)
