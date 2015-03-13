@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 # set -x
 # ffmpeg windows cross compile helper/download script
 # Copyright (C) 2014 Roger Pack, the script is under the GPLv3, but output FFmpeg's aren't necessarily
@@ -410,8 +411,9 @@ download_and_unpack_file() {
     if [[ -f $output_name ]]; then
       rm "$output_name" || exit 1
     fi
-    curl "$url" -O -L || exit 1
-    tar -xf "$output_name" || unzip "$output_name" || exit 1
+    echo "About to call curl ${url} and output_name is ${output_name} and output_dir is ${output_dir}"
+    curl -v -v -O -L "${url}" || exit 1
+    tar -xvf "$output_name" || unzip "$output_name" || exit 1
     touch "$output_dir/unpacked.successfully" || exit 1
     rm "$output_name" || exit 1
   fi
@@ -538,8 +540,10 @@ build_libx265() {
 #x264_profile_guided=y
 
 build_libx264() {
-  do_git_checkout "http://repo.or.cz/r/x264.git" "x264" "origin/stable"
+  do_git_checkout git://git.videolan.org/x264.git x264
+  echo "Changing directory to x264..."
   cd x264
+  echo "Now we're in x264."
   local configure_flags="--host=$host_target --enable-static --cross-prefix=$cross_prefix --prefix=$mingw_w64_x86_64_prefix --extra-cflags=-DPTW32_STATIC_LIB --disable-avs --disable-swscale --disable-lavf --disable-ffms --disable-gpac" # --enable-win32thread --enable-debug shouldn't hurt us since ffmpeg strips it anyway I think
   
   if [[ $high_bitdepth == "y" ]]; then
@@ -586,32 +590,31 @@ build_librtmp() {
 
 }
 
+#build_qt5() {
+#  generic_download_and_install http://www.mirrorservice.org/sites/download.qt-project.org/archive/qt/5.4/5.4.1/single/qt-everywhere-opensource-src-5.4.1.tar.gz 
+#}
+
+
 build_qt() {
-  unset CFLAGS # it makes something of its own first, which runs locally, so can't use a foreign arch, or maybe it can, but not important enough: http://stackoverflow.com/a/18775859/32453
-  # download_and_unpack_file http://download.qt-project.org/official_releases/qt/5.1/5.1.1/submodules/qtbase-opensource-src-5.1.1.tar.xz qtbase-opensource-src-5.1.1 # not officially supported seems...so didn't try it
-
-  download_and_unpack_file http://pkgs.fedoraproject.org/repo/pkgs/qt/qt-everywhere-opensource-src-4.8.5.tar.gz/1864987bdbb2f58f8ae8b350dfdbe133/qt-everywhere-opensource-src-4.8.5.tar.gz qt-everywhere-opensource-src-4.8.5
-  cd qt-everywhere-opensource-src-4.8.5
-#  download_and_unpack_file http://download.qt-project.org/archive/qt/4.8/4.8.1/qt-everywhere-opensource-src-4.8.1.tar.gz qt-everywhere-opensource-src-4.8.1
-#  cd qt-everywhere-opensource-src-4.8.1
-
-    apply_patch https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/imageformats.patch
-    apply_patch https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/qt-win64.patch
+  unset CFLAGS
+  download_and_unpack_file http://download.qt.io/archive/qt/4.8/4.8.6/qt-everywhere-opensource-src-4.8.6.tar.gz qt-everywhere-opensource-src-4.8.6
+  cd qt-everywhere-opensource-src-4.8.6
+    apply_patch_p1 https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/qplatformdefs.h.patch
+    apply_patch_p1 https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/qfiledialog.cpp.patch
     # vlc's configure options...mostly
-    do_configure "-static -release -fast -no-exceptions -no-stl -no-sql-sqlite -no-qt3support -no-gif -no-libmng -qt-libjpeg -no-libtiff -no-qdbus -no-openssl -no-webkit -sse -no-script -no-multimedia -no-phonon -opensource -no-scripttools -no-opengl -no-script -no-scripttools -no-declarative -no-declarative-debug -opensource -no-s60 -host-little-endian -confirm-license -xplatform win32-g++ -device-option CROSS_COMPILE=$cross_prefix -prefix $mingw_w64_x86_64_prefix -prefix-install -nomake examples"
+#    do_configure "-static -release -fast -no-exceptions -no-stl -no-sql-sqlite -no-qt3support -no-gif -no-libmng -qt-libjpeg -no-libtiff -no-qdbus -no-openssl -no-webkit -sse -no-script -no-multimedia -no-phonon -opensource -no-scripttools -no-opengl -no-script -no-scripttools -no-declarative -no-declarative-debug -opensource -no-s60 -host-little-endian -confirm-license -xplatform win32-g++ -device-option CROSS_COMPILE=$cross_prefix -prefix $mingw_w64_x86_64_prefix -prefix-install -nomake examples"
+    do_configure "-release -static -no-exceptions -no-sql-sqlite -no-scripttools -no-script -no-accessibility -no-qt3support -no-multimedia -no-audio-backend -no-phonon -no-phonon-backend -no-declarative -no-declarative-debug -no-s60 -host-little-endian -no-webkit -platform cygwin-g++ -xplatform win32-g++ -no-cups -no-dbus -nomake tests -nomake docs -nomake tools -opensource -confirm-license -nomake demos -nomake examples -no-libmng -device-option CROSS_COMPILE=$cross_prefix -prefix $mingw_w64_x86_64_prefix -prefix-install"
     if [ ! -f 'already_qt_maked_k' ]; then
-      make sub-src -j $cpu_count
-      make install sub-src # let it fail, baby, it still installs a lot of good stuff before dying on mng...? huh wuh?
-      cp ./plugins/imageformats/libqjpeg.a $mingw_w64_x86_64_prefix/lib || exit 1 # I think vlc's install is just broken to need this [?]
-      cp ./plugins/accessible/libqtaccessiblewidgets.a  $mingw_w64_x86_64_prefix/lib || exit 1 # this feels wrong...
-      # do_make_install "sub-src" # sub-src might make the build faster? # complains on mng? huh?
+      do_make # sub-src might make the build faster? # complains on mng? huh?
+      do_make_install
       touch 'already_qt_maked_k'
     fi
     # vlc needs an adjust .pc file? huh wuh?
-    sed -i.bak 's/Libs: -L${libdir} -lQtGui/Libs: -L${libdir} -lcomctl32 -lqjpeg -lqtaccessiblewidgets -lQtGui/' "$PKG_CONFIG_PATH/QtGui.pc" # sniff
+#    sed -i.bak 's/Libs: -L${libdir} -lQtGui/Libs: -L${libdir} -lcomctl32 -lqjpeg -lqtaccessiblewidgets -lQtGui/' "$PKG_CONFIG_PATH/QtGui.pc" # sniff
   cd ..
   export CFLAGS=$original_cflags
 }
+
 build_libsoxr() {
   #download_and_unpack_file http://sourceforge.net/projects/soxr/files/soxr-0.1.1-Source.tar.xz soxr-0.1.1-Source # not /download since apparently some tar's can't untar it without an extension?
   do_git_checkout git://git.code.sf.net/p/soxr/code "soxr-code"
@@ -631,6 +634,27 @@ build_opencv() {
   export OpenCV_INCLUDE_DIR="${OpenCV_DIR}/include"
   cd ..
   # This helps frei0r find opencv
+}
+
+build_opendcp() {
+  do_git_checkout https://code.google.com/p/opendcp/ opendcp
+  cd opendcp
+    export CMAKE_LIBRARY_PATH="${mingw_w64_x86_64_prefix}/lib"
+    export CMAKE_INCLUDE_PATH="${mingw_w64_x86_64_prefix}/include:${mingw_w64_x86_64_prefix}/include/openjpeg-2.1"
+    export CMAKE_CXX_FLAGS="-fopenmp"
+    export CMAKE_C_FLAGS="-fopenmp"
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/opendcp-toolchains-win32.cmake.patch
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/opendcp-toolchains-win32.cmake.openjpeg-2.1.patch
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/opendcp-toolchains-win32.cmake.libs.patch
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/opendcp-toolchains-win32.cmake.windres.patch
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/opendcp-packages-CMakeLists.txt-static.patch
+    do_cmake "-DENABLE_XMLSEC=ON -DENABLE_GUI=ON -DBUILD_STATIC=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DENABLE_OPENMP=OFF"
+    do_make_install
+    unset CMAKE_C_FLAGS
+    unset CMAKE_CXX_FLAGS
+    unset CMAKE_LIBRARY_PATH
+    unset CMAKE_INCLUDE_PATH
+  cd ..
 }
 
 build_libxavs() {
@@ -654,12 +678,25 @@ build_libpng() {
 
 build_libopenjpeg() {
   # does openjpeg 2.0 work with ffmpeg? possibly not yet...
-  download_and_unpack_file http://downloads.sourceforge.net/project/openjpeg.mirror/1.5.1/openjpeg-1.5.1.tar.gz openjpeg-1.5.1
-  cd openjpeg-1.5.1
+#  generic_download_and_install http://sourceforge.net/projects/openjpeg.mirror/files/1.5.2/openjpeg-1.5.2.tar.gz/download openjpeg-1.5.2 "--disable-mj2"
+  download_and_unpack_file http://downloads.sourceforge.net/project/openjpeg.mirror/1.5.2/openjpeg-1.5.2.tar.gz openjpeg-1.5.2
+  cd openjpeg-1.5.2
+    # The CMakeFile include forces /usr/include, which is no use for Mingw builds at all.
+#    sed  -i.bak "s|-I/usr/include||" applications/mj2/CMakeFiles/extract_j2k_from_mj2.dir/includes_C.rsp
     # export CFLAGS="$CFLAGS -DOPJ_STATIC" # see https://github.com/rdp/ffmpeg-windows-build-helpers/issues/37
-    do_cmake "-DBUILD_CODEC:bool=off -DBUILD_TESTS:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=OFF" 
+    do_cmake "-DBUILD_CODEC:bool=off -DBUILD_VIEWER:bool=OFF -DBUILD_MJ2:bool=OFF -DBUILD_JPWL:bool=OFF -DBUILD_JPIP:bool=OFF -DBUILD_TESTS:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_VERBOSE_MAKEFILE=OFF" 
     do_make_install
-    # export CFLAGS=$original_cflags # reset it
+   # export CFLAGS=$original_cflags # reset it
+  cd ..
+}
+
+build_libopenjpeg2() {
+  download_and_unpack_file "http://downloads.sourceforge.net/project/openjpeg.mirror/2.1.0/openjpeg-2.1.0.tar.gz" openjpeg-2.1.0
+  cd openjpeg-2.1.0
+    export CFLAGS="$CFLAGS -DOPJ_STATIC"
+    do_cmake "-D_BUILD_SHARED_LIBS:BOOL=OFF -DBUILD_VIEWER:bool=OFF -DBUILD_MJ2:bool=OFF -DBUILD_JPWL:bool=OFF -DBUILD_JPIP:bool=OFF -DBUILD_TESTS:bool=OFF -DBUILD_SHARED_LIBS:bool=OFF -DBUILD_CODEC:bool=OFF"
+    do_make_install
+    export CFLAGS=$original_cflags
   cd ..
 }
 
@@ -928,7 +965,30 @@ build_orc() {
 }
 
 build_libxml2() {
-  generic_download_and_install ftp://xmlsoft.org/libxml2/libxml2-2.9.0.tar.gz libxml2-2.9.0 "--without-python"
+  generic_download_and_install ftp://xmlsoft.org/libxml2/libxml2-2.9.2.tar.gz libxml2-2.9.2 "--without-python"
+}
+
+build_libxslt() {
+  download_and_unpack_file ftp://xmlsoft.org/libxml2/libxslt-git-snapshot.tar.gz libxslt-1.1.28
+  cd libxslt-1.1.28/libxslt
+      apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libxslt-security.c.patch
+    cd ..
+#    export LIBS="-lxml2"
+#    export LDFLAGS="-L${mingw_w64_x86_64_prefix}/lib"
+    export CFLAGS="-DLIBXML_STATIC -DLIBXSLT_STATIC -DLIBEXSLT_STATIC"
+    generic_configure_make_install "--disable-silent-rules --without-python"
+    unset CFLAGS
+#    unset LIBS
+#    unset LDFLAGS
+  cd ..
+}
+
+build_libxmlsec() {
+  download_and_unpack_file http://www.aleksey.com/xmlsec/download/xmlsec1-1.2.20.tar.gz xmlsec1-1.2.20
+  cd xmlsec1-1.2.20
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/xsltsec-Makefile.in.patch
+    generic_configure_make_install
+  cd ..
 }
 
 build_libbluray() {
@@ -1020,8 +1080,8 @@ build_libaacplus() {
 }
 
 build_openssl() {
-  download_and_unpack_file http://www.openssl.org/source/openssl-1.0.2-beta3.tar.gz openssl-1.0.2-beta3
-  cd openssl-1.0.2-beta3
+  download_and_unpack_file http://www.openssl.org/source/openssl-1.0.2.tar.gz openssl-1.0.2
+  cd openssl-1.0.2
   export cross="$cross_prefix"
   export CC="${cross}gcc"
   export AR="${cross}ar"
@@ -1225,7 +1285,7 @@ build_mediainfo() {
 		sed -i.bak 's/ -DSIZE_T_IS_LONG//g' Makefile
 		do_make_install
 		cd ../../../../MediaInfoLib/Project/GNU/Library
-		do_configure "--enable-shared=no --enable-static --host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix LDFLAGS=-static-libgcc"
+		do_configure "--enable-shared=no --enable-static --host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix LDFLAGS=-static-libgcc --with-libcurl"
 		sed -i.bak 's/ -DSIZE_T_IS_LONG//g' Makefile
 		do_make_install
 		cd ../../../../MediaInfo/Project/GNU/CLI
@@ -1318,13 +1378,23 @@ build_twolame() {
 }
 
 build_regex() {
-  generic_download_and_install "http://mingw.cvs.sourceforge.net/viewvc/mingw/regex/?view=tar" regex
+  generic_download_and_install "http://sourceforge.net/projects/mingw/files/Other/UserContributed/regex/mingw-regex-2.5.1/mingw-libgnurx-2.5.1-src.tar.gz/download" mingw-libgnurx-2.5.1
 }
 
 build_gavl() {
   do_svn_checkout svn://svn.code.sf.net/p/gmerlin/code/trunk/gavl gavl
   cd gavl
     generic_configure_make_install "--enable-shared=yes"
+  cd ..
+}
+
+build_fdkaac-commandline() {
+  do_git_checkout https://github.com/nu774/fdkaac.git fdkaac
+  cd fdkaac
+    if [[ ! -f "configure" ]]; then
+    autoreconf -fiv || exit 1 
+    fi
+    generic_configure_make_install
   cd ..
 }
 
@@ -1384,6 +1454,25 @@ build_opustools() {
 
 build_curl() {
   generic_download_and_install http://curl.haxx.se/download/curl-7.40.0.tar.bz2 curl-7.40.0 "--with-winssl --enable-ipv6"
+}
+
+build_asdcplib() {
+  export CFLAGS="-DKM_WIN32"
+  export cpu_count=1
+  download_and_unpack_file http://download.cinecert.com/asdcplib/asdcplib-1.12.60.tar.gz asdcplib-1.12.60
+  cd asdcplib-1.12.60
+    export LIBS="-lws2_32 -lcrypto -lssl -lgdi32"
+    generic_configure "CXXFLAGS=-DKM_WIN32 CFLAGS=-DKM_WIN32 --with-openssl=${mingw_w64_x86_64_prefix} --with-expat=${mingw_w64_x86_64_prefix}"
+    do_make "CXXFLAGS=-DKM_WIN32 CFLAGS=-DKM_WIN32"
+    do_make_install
+  cd .. 
+  unset LIBS
+  export CFLAGS=$original_cflags
+  export cpu_count=$original_cpu_count
+}
+
+build_libtiff() {
+  generic_download_and_install ftp://ftp.remotesensing.org/pub/libtiff/tiff-4.0.4beta.tar.gz tiff-4.0.4beta
 }
 
 build_lua() {
@@ -1745,6 +1834,7 @@ build_dependencies() {
   build_libnettle # needs gmp
 #  build_iconv # mplayer I think needs it for freetype [just it though], vlc also wants it.  looks like ffmpeg can use it too...not sure what for :)
   build_gnutls # needs libnettle, can use iconv it appears
+  build_openssl
   #build_opencv
   build_gavl # Frei0r has this as an optional dependency
   build_frei0r
@@ -1766,6 +1856,8 @@ build_dependencies() {
   build_freetype # uses bz2/zlib seemingly
   build_libexpat
   build_libxml2
+  build_libxslt 
+  build_libxmlsec
   build_libgpg-error
   build_libgcrypt
   build_libbluray # needs libxml2, freetype [FFmpeg, VLC use this, at least]
@@ -1773,11 +1865,13 @@ build_dependencies() {
   build_libdvdcss
   build_libdvdread # vlc, mplayer use it. needs dvdcss
   build_libdvdnav # vlc, mplayer use this
+  build_libtiff
   build_libxvid
   build_libxavs
   build_libsoxr
   build_libx264
   build_libx265
+  build_asdcplib
   build_lame
   build_vidstab
   build_libcaca
@@ -1806,12 +1900,12 @@ build_dependencies() {
   build_libfribidi
   build_libass # needs freetype, needs fribidi, needs fontconfig
   build_libopenjpeg
+  build_libopenjpeg2
   if [[ "$non_free" = "y" ]]; then
     build_fdk_aac
     # build_faac # not included for now, too poor quality :)
     # build_libaacplus # if you use it, conflicts with other AAC encoders <sigh>, so disabled :)
   fi
-  # build_openssl # hopefully do not need it anymore, since we use gnutls everywhere, so just don't even build it anymore
   build_librtmp # needs gnutls [or openssl...]
 #  build_smake # This is going to be useful one day
   build_regex
@@ -1825,6 +1919,7 @@ build_apps() {
 #  build_less
 #  build_coreutils
   build_opustools
+  build_curl # Needed for mediainfo to read Internet streams or files
   build_mediainfo
   if [[ $build_libmxf = "y" ]]; then
     build_libMXF
@@ -1835,12 +1930,14 @@ build_apps() {
   if [[ $build_mp4box = "y" ]]; then
     build_mp4box
   fi
-  build_curl
   build_exiv2
 #  build_cdrecord # NOTE: just now, cdrecord doesn't work on 64-bit mingw. It scans the emulated SCSI bus but no more.
   build_libcdio
   build_libcdio-paranoia
   build_lsdvd
+  build_fdkaac-commandline
+  build_qt
+  build_opendcp
 #  build_dvdbackup
   if [[ $build_ffmpeg_shared = "y" ]]; then
     build_ffmpeg ffmpeg shared
