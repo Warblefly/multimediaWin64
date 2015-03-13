@@ -411,8 +411,8 @@ download_and_unpack_file() {
     if [[ -f $output_name ]]; then
       rm "$output_name" || exit 1
     fi
-    echo "About to call curl ${url} and output_name is ${output_name} and output_dir is ${output_dir}"
-    curl -v -v -O -L "${url}" || exit 1
+#    echo "About to call curl ${url} and output_name is ${output_name} and output_dir is ${output_dir}"
+    curl -O -L "${url}" || exit 1
     tar -xvf "$output_name" || unzip "$output_name" || exit 1
     touch "$output_dir/unpacked.successfully" || exit 1
     rm "$output_name" || exit 1
@@ -541,9 +541,7 @@ build_libx265() {
 
 build_libx264() {
   do_git_checkout git://git.videolan.org/x264.git x264
-  echo "Changing directory to x264..."
   cd x264
-  echo "Now we're in x264."
   local configure_flags="--host=$host_target --enable-static --cross-prefix=$cross_prefix --prefix=$mingw_w64_x86_64_prefix --extra-cflags=-DPTW32_STATIC_LIB --disable-avs --disable-swscale --disable-lavf --disable-ffms --disable-gpac" # --enable-win32thread --enable-debug shouldn't hurt us since ffmpeg strips it anyway I think
   
   if [[ $high_bitdepth == "y" ]]; then
@@ -596,6 +594,8 @@ build_librtmp() {
 
 
 build_qt() {
+# This is quite a minimal installation to try to shorten a VERY long compile.
+# It's needed for OpenDCP and may well be extended to other programs later.
   unset CFLAGS
   download_and_unpack_file http://download.qt.io/archive/qt/4.8/4.8.6/qt-everywhere-opensource-src-4.8.6.tar.gz qt-everywhere-opensource-src-4.8.6
   cd qt-everywhere-opensource-src-4.8.6
@@ -637,6 +637,8 @@ build_opencv() {
 }
 
 build_opendcp() {
+# There are quite a few patches because I prefer to build this as a static program,
+# whereas the author, understandably, created it as a dynamically-linked program.
   do_git_checkout https://code.google.com/p/opendcp/ opendcp
   cd opendcp
     export CMAKE_LIBRARY_PATH="${mingw_w64_x86_64_prefix}/lib"
@@ -677,8 +679,7 @@ build_libpng() {
 }  
 
 build_libopenjpeg() {
-  # does openjpeg 2.0 work with ffmpeg? possibly not yet...
-#  generic_download_and_install http://sourceforge.net/projects/openjpeg.mirror/files/1.5.2/openjpeg-1.5.2.tar.gz/download openjpeg-1.5.2 "--disable-mj2"
+# FFmpeg doesn't yet take Openjpeg 2 so we compile version 1 here.
   download_and_unpack_file http://downloads.sourceforge.net/project/openjpeg.mirror/1.5.2/openjpeg-1.5.2.tar.gz openjpeg-1.5.2
   cd openjpeg-1.5.2
     # The CMakeFile include forces /usr/include, which is no use for Mingw builds at all.
@@ -1294,7 +1295,7 @@ build_mediainfo() {
 		do_make_install
 #                cd ../../../../..
 		cd ../../../../..
-		echo "Now returned to `pwd`"
+#		echo "Now returned to `pwd`"
 }
 
 build_libtool() {
