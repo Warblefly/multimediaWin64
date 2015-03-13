@@ -5,10 +5,10 @@
  
  IF(TARGET_ARCH STREQUAL "i686")
 -    SET(CMAKE_RC_COMPILER /usr/bin/i686-w64-mingw32-windres) 
-+    SET(CMAKE_RC_COMPILER ${SYSROOT_PATH}/bin/i686-w64-mingw32-windres) 
++    SET(CMAKE_RC_COMPILER ${SYSROOT_PATH}/../bin/i686-w64-mingw32-windres) 
  ELSE()
 -    SET(CMAKE_RC_COMPILER /usr/bin/x86_64-w64-mingw32-windres) 
-+    SET(CMAKE_RC_COMPILER ${SYSROOT_PATH}/bin/x86_64-w64-mingw32-windres) 
++    SET(CMAKE_RC_COMPILER ${SYSROOT_PATH}/../bin/x86_64-w64-mingw32-windres) 
  ENDIF()
  
  INCLUDE_DIRECTORIES(${SYSROOT_PATH}/include/libxml2)
