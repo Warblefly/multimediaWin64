@@ -147,9 +147,9 @@ install_cross_compiler() {
   echo "building cross compile gcc [requires internet access]"
 # Quick patch to update GCC to 4.9.2
   sed -i.bak "s/gcc_release_ver='4.9.1'/gcc_release_ver='4.9.2'/" mingw-w64-build-3.6.4
-  sed -i.bak "s/mingw_w64_release_ver='3.2.0'/mingw_w64_release_ver='3.3.0'/" mingw-w64-build-3.6.4
+  sed -i.bak "s/mingw_w64_release_ver='3.2.0'/mingw_w64_release_ver='4.0.0'/" mingw-w64-build-3.6.4
   sed -i.bak "s/binutils_release_ver='2.24'/binutils_release_ver='2.25'/" mingw-w64-build-3.6.4
-  nice ./mingw-w64-build-3.6.4 --clean-build --disable-shared --default-configure --mingw-w64-ver=3.3.0 --gcc-ver=4.9.2 --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=2.25 --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
+  nice ./mingw-w64-build-3.6.4 --clean-build --disable-shared --default-configure --mingw-w64-ver=4.0.0 --gcc-ver=4.9.2 --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=2.25 --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
   export CFLAGS=$original_cflags # reset it
   if [ -d mingw-w64-x86_64 ]; then
     touch mingw-w64-x86_64/compiler.done
@@ -919,6 +919,7 @@ build_libtheora() {
 #    cd ..
     do_svn_checkout http://svn.xiph.org/trunk/theora theora
     cd theora
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/theora-examples-encoder_example.c.patch
       generic_configure_make_install
     cd ..
   #generic_download_and_install http://downloads.xiph.org/releases/theora/libtheora-1.2.0alpha1.tar.gz libtheora-1.2.0alpha1
@@ -1110,7 +1111,7 @@ build_fdk_aac() {
     if [[ ! -f "configure" ]]; then
       autoreconf -fiv || exit 1
     fi
-    generic_configure_make_install
+    generic_configure_make_install "--enable-example=yes"
   cd ..
 }
 
@@ -1135,13 +1136,13 @@ build_libgpg-error() {
 }
 
 build_libgcrypt() {
-  generic_download_and_install ftp://ftp.gnupg.org/gcrypt/libgcrypt/libgcrypt-1.6.2.tar.gz libgcrypt-1.6.2 "--disable-asm"
+  generic_download_and_install ftp://ftp.gnupg.org/gcrypt/libgcrypt/libgcrypt-1.6.2.tar.gz libgcrypt-1.6.2 "--disable-asm --disable-optimization"
 }
 
 build_freetype() {
   download_and_unpack_file http://download.savannah.gnu.org/releases/freetype/freetype-2.5.5.tar.bz2 freetype-2.5.5
   cd freetype-2.5.5
-  generic_configure "--with-png=no --host=x86_64-w64-mingw32 --build=x86_64-pc-cygwin"
+  generic_configure "--with-png=yes --host=x86_64-w64-mingw32 --build=x86_64-pc-cygwin"
 #  cd src/tools
 #    "/usr/bin/gcc -v apinames.c -o apinames.exe"
 #    cp apinames.exe ../../objs
@@ -1193,14 +1194,44 @@ build_sdl() {
   rmdir temp
 }
 
+#build_sdl2() {
+#  # Building this for mpv but FIXME it always links libsdl(1) anyway. 
+#  download_and_unpack_file https://www.libsdl.org/release/SDL2-2.0.3.tar.gz SDL2-2.0.3
+#  cd SDL2-2.0.3
+#    # DBL_EPSILON 21 Feb 2015 starts to come back "undefined". I have NO IDEA why.
+#    grep -lr DBL_EPSILON src | xargs sed -i "s| DBL_EPSILON| 2.2204460492503131E-16|g"
+#    generic_configure_make_install
+#  cd ..
+#}
+
+
 build_sdl2() {
-  # Building this for mpv but FIXME it always links libsdl(1) anyway. 
-  download_and_unpack_file https://www.libsdl.org/release/SDL2-2.0.3.tar.gz SDL2-2.0.3
-  cd SDL2-2.0.3
-    # DBL_EPSILON 21 Feb 2015 starts to come back "undefined". I have NO IDEA why.
-    grep -lr DBL_EPSILON src | xargs sed -i "s| DBL_EPSILON| 2.2204460492503131E-16|g"
-    generic_configure_make_install
-  cd ..
+  local old_hg_version
+  if [[ -d SDL ]]; then
+    cd SDL
+      echo "doing hg pull -u SDL"
+      old_hg_version=`hg --debug id -i`
+      hg pull -u || exit 1
+      hg update || exit 1 # guess you need this too if no new changes are brought down [what the...]
+  else
+    hg clone http://hg.libsdl.org/SDL || exit 1
+    cd SDL
+      old_hg_version=none-yet
+  fi
+  mkdir build
+
+  local new_hg_version=`hg --debug id -i`
+  if [[ "$old_hg_version" != "$new_hg_version" ]]; then
+    echo "got upstream hg changes, forcing rebuild...SDL2"
+    cd build
+      rm already*
+      do_configure "--disable-shared --enable-static --disable-render-d3d" "../configure" #3d3 disabled due to mingw-w64-4.0.0 and SDL disagreements
+      do_make_install  
+    cd ..
+  else
+    echo "still at hg $new_hg_version SDL2"
+  fi
+  cd ..  
 }
 
 build_mpv() {
@@ -1857,10 +1888,10 @@ build_dependencies() {
   build_freetype # uses bz2/zlib seemingly
   build_libexpat
   build_libxml2
-  build_libxslt 
+  build_libxslt
+  build_libgpg-error # Needed by libgcrypt 
+  build_libgcrypt # Needed by libxmlsec 
   build_libxmlsec
-  build_libgpg-error
-  build_libgcrypt
   build_libbluray # needs libxml2, freetype [FFmpeg, VLC use this, at least]
   build_libjpeg_turbo # mplayer can use this, VLC qt might need it? [replaces libjpeg]
   build_libdvdcss
@@ -1878,6 +1909,7 @@ build_dependencies() {
   build_libcaca
   build_libmodplug # ffmepg and vlc can use this
   build_zvbi
+  build_regex # Needed by libcddb
   build_libcddb
   build_libvpx
   build_vo_aacenc
@@ -1909,7 +1941,6 @@ build_dependencies() {
   fi
   build_librtmp # needs gnutls [or openssl...]
 #  build_smake # This is going to be useful one day
-  build_regex
   build_lua
 #  build_cygwin
   #  build_ncurses
