@@ -1120,6 +1120,41 @@ build_libexpat() {
   generic_download_and_install http://sourceforge.net/projects/expat/files/expat/2.1.0/expat-2.1.0.tar.gz/download expat-2.1.0
 }
 
+build_ladspa() {
+  curl -vo "${mingw_w64_x86_64_prefix}/include/ladspa.h" http://www.ladspa.org/ladspa_sdk/ladspa.h.txt
+}
+
+build_libfftw() {
+  generic_download_and_install http://www.fftw.org/fftw-3.3.4.tar.gz fftw-3.3.4 "--with-our-malloc16 --with-windows-f77-mangling --enable-threads --with-combined-threads --enable-portable-binary --enable-sse2 --with-incoming-stack-boundary=2"
+}
+
+build_libsamplerate() {
+  generic_download_and_install http://www.mega-nerd.com/SRC/libsamplerate-0.1.8.tar.gz libsamplerate-0.1.8
+}
+
+build_vamp-sdk() {
+  export cpu_count=1
+  generic_download_and_install http://code.soundsoftware.ac.uk/attachments/download/690/vamp-plugin-sdk-2.5.tar.gz vamp-plugin-sdk-2.5
+  # Vamp installs shared libraries. They confuse mpv's linker (I think)
+  echo "Now executing rm -fv $mingw_w64_x86_64_prefix/lib/libvamp*.so*"
+  rm -fv $mingw_w64_x86_64_prefix/lib/libvamp*.so*
+  export cpu_count=$original_cpu_count
+}
+
+build_librubberband() {
+  download_and_unpack_file http://code.breakfastquay.com/attachments/download/34/rubberband-1.8.1.tar.bz2 rubberband-1.8.1
+  cd rubberband-1.8.1
+     generic_configure
+     export cpu_count=1 
+     do_make_install
+     # The shared libraries must vanish
+     rm -fv ${mingw_w64_x86_64_prefix}/lib/librubberband*.so*
+     # Need to force static linkers to link other libraries that rubberband depends on
+     sed -i.bak 's/-lrubberband/-lrubberband -lsamplerate -lfftw3/' "$PKG_CONFIG_PATH/rubberband.pc"
+     export cpu_count=$original_cpu_count
+  cd ..
+}
+
 build_iconv() {
   generic_download_and_install http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz libiconv-1.14
   # We also need an empty langinfo.h to compile this
@@ -1225,7 +1260,7 @@ build_sdl2() {
     echo "got upstream hg changes, forcing rebuild...SDL2"
     cd build
       rm already*
-      do_configure "--disable-shared --enable-static --disable-render-d3d" "../configure" #3d3 disabled due to mingw-w64-4.0.0 and SDL disagreements
+      do_configure "--host=x86_64-w64-mingw32 --disable-shared --enable-static --disable-render-d3d" "../configure" #3d3 disabled due to mingw-w64-4.0.0 and SDL disagreements
       do_make_install  
     cd ..
   else
@@ -1240,7 +1275,7 @@ build_mpv() {
     ./bootstrap.py
     export DEST_OS=win32
     export TARGET=x86_64-w64-mingw32
-    do_configure "configure --prefix=${mingw_w64_x86_64_prefix} --enable-win32-internal-pthreads --disable-x11 --disable-lcms2 --enable-static-build --enable-sdl1 --disable-sdl2 --disable-debug-build" "./waf"
+    do_configure "configure --prefix=${mingw_w64_x86_64_prefix} --enable-win32-internal-pthreads --disable-x11 --disable-lcms2 --enable-static-build --enable-sdl1 --disable-sdl2 --disable-debug-build --disable-ladspa" "./waf"
     ./waf build
     ./waf install
     unset DEST_OS
@@ -1924,7 +1959,10 @@ build_dependencies() {
     rm $mingw_w64_x86_64_prefix/lib/libgsm.a # because make uninstall in gsm-1.0-pl13 
                                              # doesn't actually remove the installed library
   fi
+  build_libfftw
   build_libsndfile
+  build_vamp-sdk
+  build_libsamplerate # for librubberband
   build_libbs2b
   build_sox # This is a problem: it must be built before libgsm is created otherwise libgsm clashes with libsndfile
   build_libgsm
@@ -1942,6 +1980,8 @@ build_dependencies() {
   build_librtmp # needs gnutls [or openssl...]
 #  build_smake # This is going to be useful one day
   build_lua
+  build_ladspa # Not a real build: just copying the API header file into place
+  build_librubberband # for mpv
 #  build_cygwin
   #  build_ncurses
 }
