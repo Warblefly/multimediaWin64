@@ -881,7 +881,7 @@ build_win32_pthreads() {
 }
 
 build_libdlfcn() {
-  do_git_checkout https://github.com/dlfcn-win32/dlfcn-win32.git dlfcn-win32
+  do_git_checkout git://github.com/dlfcn-win32/dlfcn-win32.git dlfcn-win32
   cd dlfcn-win32
     ./configure --disable-shared --enable-static --cross-prefix=$cross_prefix --prefix=$mingw_w64_x86_64_prefix
     do_make_install
@@ -1587,6 +1587,15 @@ build_sox() {
   cd ..
 }
 
+build_ffms2() {
+  do_git_checkout https://github.com/FFMS/ffms2.git ffms2
+  cd ffms2
+    if [[ ! -f "configure" ]]; then
+      autoreconf -fiv
+    fi
+    generic_configure_make_install
+  cd ..
+}
 
 build_flac() {
   do_git_checkout git://git.xiph.org/flac.git flac
@@ -2020,6 +2029,7 @@ build_apps() {
   if [[ $build_libav = "y" ]]; then
     build_ffmpeg libav
   fi
+  build_ffms2
   build_mpv
   # build_opencv # We place it here because opencv has an interface to FFmpeg
   if [[ $build_vlc = "y" ]]; then
