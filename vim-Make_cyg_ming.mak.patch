@@ -1,0 +1,15 @@
+--- Make_cyg_ming.mak.orig	2015-04-02 15:41:15.405829500 +0100
++++ Make_cyg_ming.mak	2015-04-02 15:42:19.857896300 +0100
+@@ -39,10 +39,10 @@
+ DIRECTX=no
+ # FEATURES=[TINY | SMALL | NORMAL | BIG | HUGE]
+ # Set to TINY to make minimal version (few features).
+-FEATURES=BIG
++FEATURES=HUGE
+ # Set to one of i386, i486, i586, i686 as the minimum target processor.
+ # For amd64/x64 architecture set ARCH=x86-64 .
+-ARCH=i386
++ARCH=x86-64
+ # Set to yes to cross-compile from unix; no=native Windows (and Cygwin).
+ CROSS=no
+ # Set to path to iconv.h and libiconv.a to enable using 'iconv.dll'.
