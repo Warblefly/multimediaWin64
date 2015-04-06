@@ -5,6 +5,16 @@
 # Copyright (C) 2014 Roger Pack, the script is under the GPLv3, but output FFmpeg's aren't necessarily
 # with modifications by John Warburton john@johnwarburton.com
 
+#Gnulib
+# 1. Check it out separately
+# 2. 
+
+#Gnu Coreutils
+# 1. Remove configure test for mounted file system list
+# 2. Set -Werror inactive
+
+
+
 yes_no_sel () {
   unset user_input
   local question="$1"
@@ -26,7 +36,7 @@ yes_no_sel () {
 }
 
 check_missing_packages () {
-  local check_packages=('curl' 'pkg-config' 'make' 'git' 'svn' 'cmake' 'gcc' 'autoconf' 'libtool' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg' 'patch' 'pax' 'bzr')
+  local check_packages=('curl' 'pkg-config' 'make' 'git' 'svn' 'cmake' 'gcc' 'autoconf' 'libtool' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg' 'patch' 'pax' 'bzr' 'gperf')
   for package in "${check_packages[@]}"; do
     type -P "$package" >/dev/null || missing_packages=("$package" "${missing_packages[@]}")
   done
@@ -584,6 +594,8 @@ build_librtmp() {
   cd ..
    # TODO do_make here instead...
    make SYS=mingw CRYPTO=GNUTLS OPT=-O2 CROSS_COMPILE=$cross_prefix SHARED=no LIB_GNUTLS="`pkg-config --libs gnutls` -lz" || exit 1
+   # The makefile doesn't install
+   cp -fv rtmpdump.exe rtmpgw.exe rtmpsrv.exe rtmpsuck.exe "${mingw_w64_x86_64_prefix}/bin"
   cd ..
 
 }
@@ -832,7 +844,11 @@ build_ncurses() {
   export PATH_SEPARATOR=";"
   echo "mkdir -v -p ${mingw_w64_x86_64_prefix}/share/terminfo"
   mkdir -v -p ${mingw_w64_x86_64_prefix}/share/terminfo
-  generic_download_and_install ftp://invisible-island.net/ncurses/current/ncurses-5.9-20150110.tgz ncurses-5.9-20150110 "--enable-term-driver --enable-sp-funcs --without-ada --with-debug=no --with-shared=no --disable-home-terminfo --enable-database --with-progs --enable-interop --enable-pc-files --disable-termcap"
+  if [[ ! -f terminfo.src ]]; then
+    wget http://invisible-island.net/datafiles/current/terminfo.src.gz
+    gunzip terminfo.src.gz
+  fi
+  generic_download_and_install ftp://invisible-island.net/ncurses/current/ncurses-5.9-20150329.tgz ncurses-5.9-20150329 "--with-libtool --disable-termcap --enable-widec --enable-term-driver --enable-sp-funcs --without-ada --with-debug=no --with-shared=no --enable-database --with-progs --enable-interop --enable-pc-files"
   unset PATH_SEPARATOR
 }
 
@@ -1065,7 +1081,7 @@ build_libxvid() {
 build_fontconfig() {
   download_and_unpack_file http://www.freedesktop.org/software/fontconfig/release/fontconfig-2.11.1.tar.gz fontconfig-2.11.1
   cd fontconfig-2.11.1
-    generic_configure --disable-docs
+    generic_configure "--disable-docs"
     do_make_install
   cd .. 
   sed -i.bak 's/-L${libdir} -lfontconfig[^l]*$/-L${libdir} -lfontconfig -lfreetype -lexpat/' "$PKG_CONFIG_PATH/fontconfig.pc"
@@ -1268,6 +1284,39 @@ build_sdl2() {
   fi
   cd ..  
 }
+
+build_vim() {
+  local old_hg_version
+  if [[ -d vim ]]; then
+    cd vim
+      echo "doing hg pull -u vim"
+      old_hg_version=`hg --debug id -i`
+      hg pull -u || exit 1
+      hg update || exit 1 # guess you need this too if no new changes are brought down [what the...]
+  else
+    hg clone http://vim.googlecode.com/hg vim || exit 1
+    cd vim
+      old_hg_version=none-yet
+  fi
+  
+  local new_hg_version=`hg --debug id -i`
+  if [[ "$old_hg_version" != "$new_hg_version" ]]; then
+    echo "got upstream hg changes, forcing rebuild...vim"
+    cd src
+      rm already*
+      apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/vim-Make_cyg_ming.mak.patch
+      echo "Now we are going to build vim."
+      WINVER=0x0603 CROSS_COMPILE=${cross_prefix} make -f Make_ming.mak
+      echo "Vim is built, but not installed."
+      cp -fv gvim.exe vimrun.exe "${mingw_w64_x86_64_prefix}/bin"
+    cd ..
+  # Built but not yet installed
+  else
+    echo "still at hg $new_hg_version vim"
+  fi
+  cd ..
+}
+
 
 build_mpv() {
   do_git_checkout https://github.com/mpv-player/mpv.git mpv
@@ -1854,7 +1903,7 @@ build_ffmpeg() {
 
   config_options="--arch=$arch --target-os=mingw32 --cross-prefix=$cross_prefix --pkg-config=pkg-config --disable-doc --enable-gpl --enable-libx264 --enable-avisynth --enable-libxvid --enable-libmp3lame --enable-version3 --enable-zlib --enable-librtmp --enable-libvorbis --enable-libtheora --enable-libspeex --enable-libopenjpeg --enable-gnutls --enable-libgsm --enable-libfreetype --enable-libopus --disable-w32threads --enable-frei0r --enable-filter=frei0r --enable-libvo-aacenc --enable-bzlib --enable-libxavs --extra-cflags=-DPTW32_STATIC_LIB --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libvo-amrwbenc --enable-libschroedinger --enable-libvpx --enable-libilbc --enable-libbs2b --prefix=$mingw_w64_x86_64_prefix $extra_configure_opts --extra-cflags=$CFLAGS" # other possibilities: --enable-w32threads --enable-libflite
   if [[ "$non_free" = "y" ]]; then
-    config_options="$config_options --enable-nonfree --enable-libfdk-aac --disable-libfaac --disable-decoder=aac" # To use fdk-aac in VLC, we need to change FFMPEG's default (faac), but I haven't found how to do that... So I disabled it. This could be an new option for the script? -- faac deemed too poor quality and becomes the default -- add it in and uncomment the build_faac line to include it 
+    config_options="$config_options --enable-nonfree --enable-libfdk-aac --disable-libfaac --enable-decoder=aac" # To use fdk-aac in VLC, we need to change FFMPEG's default (faac), but I haven't found how to do that... So I disabled it. This could be an new option for the script? -- faac deemed too poor quality and becomes the default -- add it in and uncomment the build_faac line to include it 
     # other possible options: --enable-openssl --enable-libaacplus
   else
     config_options="$config_options"
@@ -1871,8 +1920,8 @@ build_ffmpeg() {
   rm -f */*.a */*.dll *.exe # just in case some dependency library has changed, force it to re-link even if the ffmpeg source hasn't changed...
   rm already_ran_make*
   echo "doing ffmpeg make $(pwd)"
-  do_make
-  do_make_install # install ffmpeg to get libavcodec libraries to be used as dependencies for other things, like vlc [XXX make this a parameter?] or install shared to a local dir
+  do_make "V=1"
+  do_make_install "V=1" # install ffmpeg to get libavcodec libraries to be used as dependencies for other things, like vlc [XXX make this a parameter?] or install shared to a local dir
 
   # build ismindex.exe, too, just for fun 
   make tools/ismindex.exe
@@ -1928,7 +1977,7 @@ build_dependencies() {
   build_libtheora # needs libvorbis, libogg
   build_orc
   build_libschroedinger # needs orc
-  echo "Now ready to build freetype"
+  build_ncurses
   build_freetype # uses bz2/zlib seemingly
   build_libexpat
   build_libxml2
@@ -1991,8 +2040,7 @@ build_dependencies() {
   build_lua
   build_ladspa # Not a real build: just copying the API header file into place
   build_librubberband # for mpv
-#  build_cygwin
-  #  build_ncurses
+  build_vim
 }
 
 build_apps() {
@@ -2158,6 +2206,9 @@ if [ -d "mingw-w64-x86_64" ]; then # they installed a 64-bit compiler
   build_apps
   cd ..
 fi
+
+echo "Stripping all binaries..."
+${cross_prefix}strip.exe -p -s -v ${mingw_w64_x86_64_prefix}/bin/*exe
 
 #echo "searching for some local exes..."
 #for file in $(find_all_build_exes); do
