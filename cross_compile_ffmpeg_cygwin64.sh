@@ -840,6 +840,12 @@ build_libdvdcss() {
   generic_download_and_install http://download.videolan.org/pub/videolan/libdvdcss/1.3.99/libdvdcss-1.3.99.tar.bz2 libdvdcss-1.3.99
 }
 
+build_gdb() {
+  export LIBS="-lpsapi -ldl"
+  generic_download_and_install http://ftp.gnu.org/gnu/gdb/gdb-7.9.tar.xz gdb-7.9
+  unset LIBS
+}
+
 build_ncurses() {
   export PATH_SEPARATOR=";"
   echo "mkdir -v -p ${mingw_w64_x86_64_prefix}/share/terminfo"
@@ -1920,7 +1926,7 @@ build_ffmpeg() {
   rm -f */*.a */*.dll *.exe # just in case some dependency library has changed, force it to re-link even if the ffmpeg source hasn't changed...
   rm already_ran_make*
   echo "doing ffmpeg make $(pwd)"
-  do_make "V=1"
+  do_make 
   do_make_install "V=1" # install ffmpeg to get libavcodec libraries to be used as dependencies for other things, like vlc [XXX make this a parameter?] or install shared to a local dir
 
   # build ismindex.exe, too, just for fun 
@@ -2049,6 +2055,7 @@ build_apps() {
 #  build_coreutils
   build_opustools
   build_curl # Needed for mediainfo to read Internet streams or files
+  build_gdb # Really useful, and the correct version for Windows executables
   build_mediainfo
   if [[ $build_libmxf = "y" ]]; then
     build_libMXF
@@ -2209,7 +2216,8 @@ fi
 
 echo "Stripping all binaries..."
 ${cross_prefix}strip.exe -p -s -v ${mingw_w64_x86_64_prefix}/bin/*exe
-
+echo "Binaries are stripped. Debugging versions of FFmpeg programs ending _g"
+echo "are in build directory."
 #echo "searching for some local exes..."
 #for file in $(find_all_build_exes); do
 #  echo "built $file"
