@@ -1,0 +1,10 @@
+--- libdvdcss.c.orig	2015-04-16 11:53:25.628176300 +0100
++++ libdvdcss.c	2015-04-16 11:54:04.576413500 +0100
+@@ -117,6 +117,7 @@
+ #endif
+ 
+ #ifdef _WIN32
++#   include <windows.h>
+ #   include <shlobj.h>
+ #endif
+ 
