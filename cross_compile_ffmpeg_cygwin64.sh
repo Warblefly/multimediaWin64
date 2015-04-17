@@ -147,19 +147,19 @@ install_cross_compiler() {
   if [[ -z $build_choice ]]; then
     pick_compiler_flavors
   fi
-  if [[ -f mingw-w64-build-3.6.4 ]]; then
-    rm mingw-w64-build-3.6.4 || exit 1
+  if [[ -f mingw-w64-build-3.6.6 ]]; then
+    rm mingw-w64-build-3.6.6 || exit 1
   fi 
-  curl http://zeranoe.com/scripts/mingw_w64_build/mingw-w64-build-3.6.4 -O || exit 1
-  chmod u+x mingw-w64-build-3.6.4
+  curl http://zeranoe.com/scripts/mingw_w64_build/mingw-w64-build-3.6.6 -O || exit 1
+  chmod u+x mingw-w64-build-3.6.6
   unset CFLAGS # don't want these for the compiler itself since it creates executables to run on the local box
   # pthreads version to avoid having to use cvs for it
   echo "building cross compile gcc [requires internet access]"
-# Quick patch to update GCC to 4.9.2
-  sed -i.bak "s/gcc_release_ver='4.9.1'/gcc_release_ver='4.9.2'/" mingw-w64-build-3.6.4
-  sed -i.bak "s/mingw_w64_release_ver='3.2.0'/mingw_w64_release_ver='4.0.0'/" mingw-w64-build-3.6.4
-  sed -i.bak "s/binutils_release_ver='2.24'/binutils_release_ver='2.25'/" mingw-w64-build-3.6.4
-  nice ./mingw-w64-build-3.6.4 --clean-build --disable-shared --default-configure --mingw-w64-ver=4.0.0 --gcc-ver=4.9.2 --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=2.25 --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
+# Quick patch to update mingw to 4.0.1
+  sed -i.bak "s/mingw_w64_release_ver='3.3.0'/mingw_w64_release_ver='4.0.1'/" mingw-w64-build-3.6.6
+# Gendef compilation throws a char-as-array-index error when invoked with "--target=" : "--host" avoids this.
+  sed -i.bak 's#gendef/configure" --build="$system_type" --prefix="$mingw_w64_prefix" --target#gendef/configure" --build="$system_type" --prefix="$mingw_w64_prefix" --host#' mingw-w64-build-3.6.6
+  nice ./mingw-w64-build-3.6.6 --clean-build --disable-shared --default-configure --mingw-w64-ver=4.0.1 --gcc-ver=4.9.2 --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=2.25 --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
   export CFLAGS=$original_cflags # reset it
   if [ -d mingw-w64-x86_64 ]; then
     touch mingw-w64-x86_64/compiler.done
@@ -466,7 +466,33 @@ generic_download_and_install() {
 
 generic_configure_make_install() {
   generic_configure "$1"
-  do_make_install
+  do_make_and_make_install
+}
+
+do_make_and_make_install() {
+  local extra_make_options="$1"
+  do_make "$extra_make_options"
+  local touch_name=$(get_small_touchfile_name already_ran_make_install "$extra_make_options")
+  if [ ! -f $touch_name ]; then
+    echo "make installing $(pwd) as $ PATH=$PATH make install $extra_make_options"
+    nice make install $extra_make_options || exit 1
+    touch $touch_name || exit 1
+  fi
+}
+
+do_cmake_and_install() {
+  extra_args="$1" 
+  local touch_name=$(get_small_touchfile_name already_ran_cmake "$extra_args")
+
+  if [ ! -f $touch_name ]; then
+    rm -f already_* # reset so that make will run again if option just changed
+    local cur_dir2=$(pwd)
+    echo doing cmake in $cur_dir2 with PATH=$PATH  with extra_args=$extra_args like this:
+    echo cmake –G”Unix Makefiles” . -DENABLE_STATIC_RUNTIME=1 -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_RANLIB=${cross_prefix}ranlib -DCMAKE_C_COMPILER=${cross_prefix}gcc -DCMAKE_CXX_COMPILER=${cross_prefix}g++ -DCMAKE_RC_COMPILER=${cross_prefix}windres -DCMAKE_INSTALL_PREFIX=$mingw_w64_x86_64_prefix $extra_args
+    cmake –G”Unix Makefiles” . -DENABLE_STATIC_RUNTIME=1 -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_RANLIB=${cross_prefix}ranlib -DCMAKE_C_COMPILER=${cross_prefix}gcc -DCMAKE_CXX_COMPILER=${cross_prefix}g++ -DCMAKE_RC_COMPILER=${cross_prefix}windres -DCMAKE_INSTALL_PREFIX=$mingw_w64_x86_64_prefix $extra_args || exit 1
+    touch $touch_name || exit 1
+  fi
+  do_make_and_make_install
 }
 
 build_libx265() {
@@ -837,7 +863,15 @@ build_libdvdnav() {
 }
 
 build_libdvdcss() {
-  generic_download_and_install http://download.videolan.org/pub/videolan/libdvdcss/1.3.99/libdvdcss-1.3.99.tar.bz2 libdvdcss-1.3.99
+  do_git_checkout git://git.videolan.org/libdvdcss libdvdcss
+  cd libdvdcss/src
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libdvdcss.c.patch
+    cd ..
+    if [[ ! -f "configure" ]]; then
+      autoreconf -fiv || exit 1
+    fi
+    generic_configure_make_install
+  cd ..
 }
 
 build_gdb() {
@@ -854,7 +888,7 @@ build_ncurses() {
     wget http://invisible-island.net/datafiles/current/terminfo.src.gz
     gunzip terminfo.src.gz
   fi
-  generic_download_and_install ftp://invisible-island.net/ncurses/current/ncurses-5.9-20150329.tgz ncurses-5.9-20150329 "--with-libtool --disable-termcap --enable-widec --enable-term-driver --enable-sp-funcs --without-ada --with-debug=no --with-shared=no --enable-database --with-progs --enable-interop --enable-pc-files"
+  generic_download_and_install ftp://invisible-island.net/ncurses/current/ncurses-5.9-20150404.tgz ncurses-5.9-20150404 "--with-libtool --disable-termcap --enable-widec --enable-term-driver --enable-sp-funcs --without-ada --with-debug=no --with-shared=no --enable-database --with-progs --enable-interop --enable-pc-files"
   unset PATH_SEPARATOR
 }
 
@@ -1016,8 +1050,11 @@ build_libxmlsec() {
 }
 
 build_libbluray() {
-  generic_download_and_install ftp://ftp.videolan.org/pub/videolan/libbluray/0.5.0/libbluray-0.5.0.tar.bz2 libbluray-0.5.0 "--without-libxml2"
-  sed -i.bak 's/-lbluray.*$/-lbluray -lfreetype -lexpat -lz -lbz2/' "$PKG_CONFIG_PATH/libbluray.pc" # not sure...is this a blu-ray bug, or VLC's problem in not pulling freetype's .pc file? or our problem with not using pkg-config --static ...
+  do_git_checkout git://git.videolan.org/libbluray.git libbluray
+  cd libbluray
+    generic_configure_make_install "--disable-bdjava"
+  cd ..
+#  sed -i.bak 's/-lbluray.*$/-lbluray -lfreetype -lexpat -lz -lbz2/' "$PKG_CONFIG_PATH/libbluray.pc" # not sure...is this a blu-ray bug, or VLC's problem in not pulling freetype's .pc file? or our problem with not using pkg-config --static ...
 }
 
 build_libschroedinger() {
@@ -1104,8 +1141,8 @@ build_libaacplus() {
 }
 
 build_openssl() {
-  download_and_unpack_file http://www.openssl.org/source/openssl-1.0.2.tar.gz openssl-1.0.2
-  cd openssl-1.0.2
+  download_and_unpack_file http://www.openssl.org/source/openssl-1.0.2a.tar.gz openssl-1.0.2a
+  cd openssl-1.0.2a
   export cross="$cross_prefix"
   export CC="${cross}gcc"
   export AR="${cross}ar"
@@ -1350,6 +1387,30 @@ build_libbs2b() {
   generic_download_and_install http://downloads.sourceforge.net/project/bs2b/libbs2b/3.1.0/libbs2b-3.1.0.tar.gz libbs2b-3.1.0
 }
 
+build_libgame-music-emu() {
+  download_and_unpack_file  https://bitbucket.org/mpyne/game-music-emu/downloads/game-music-emu-0.6.0.tar.bz2 game-music-emu-0.6.0
+  cd game-music-emu-0.6.0
+    sed -i.bak "s|SHARED|STATIC|" gme/CMakeLists.txt
+    do_cmake_and_install
+  cd ..
+}
+
+build_libdcadec() {
+  do_git_checkout https://github.com/foo86/dcadec.git dcadec_git
+  cd dcadec_git
+    do_make_and_make_install "CC=$(echo $cross_prefix)gcc AR=$(echo $cross_prefix)ar PREFIX=$mingw_w64_x86_64_prefix"
+  cd ..
+}
+
+build_libwebp() {
+  generic_download_and_install http://downloads.webmproject.org/releases/webp/libwebp-0.4.3.tar.gz libwebp-0.4.3
+}
+
+build_wavpack() {
+  generic_download_and_install http://wavpack.com/wavpack-4.70.0.tar.bz2 wavpack-4.70.0
+}
+
+
 build_lame() {
   # generic_download_and_install http://sourceforge.net/projects/lame/files/lame/3.99/lame-3.99.5.tar.gz/download lame-3.99.5
   do_git_checkout https://github.com/rbrito/lame.git lame
@@ -1483,14 +1544,18 @@ build_libmodplug() {
 }
 
 build_libcaca() {
-  local cur_dir2=$(pwd)/libcaca-0.99.beta18
-  download_and_unpack_file http://ftp.netbsd.org/pub/pkgsrc/distfiles/libcaca-0.99.beta18.tar.gz libcaca-0.99.beta18
-  cd libcaca-0.99.beta18
+  local cur_dir2=$(pwd)/libcaca
+  do_git_checkout git://github.com/cacalabs/libcaca libcaca
+#  download_and_unpack_file http://ftp.netbsd.org/pub/pkgsrc/distfiles/libcaca-0.99.beta18.tar.gz libcaca-0.99.beta18
+  cd libcaca
+  # vsnprintf is defined both in libcaca and by mingw-w64-4.0.1 so we'll keep the system definition
+  apply_patch_p1 https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libcaca-vsnprintf.patch
+  apply_patch_p1 https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libcaca-signals.patch
   cd caca
     sed -i.bak "s/__declspec(dllexport)//g" *.h # get rid of the declspec lines otherwise the build will fail for undefined symbols
     sed -i.bak "s/__declspec(dllimport)//g" *.h 
   cd ..
-  generic_configure_make_install "--libdir=$mingw_w64_x86_64_prefix/lib --disable-cxx --disable-csharp --disable-java --disable-python --disable-ruby --disable-imlib2 --disable-doc"
+  generic_configure_make_install "--libdir=$mingw_w64_x86_64_prefix/lib --disable-cxx --disable-csharp --disable-java --disable-python --disable-ruby --disable-imlib2 --disable-doc --disable-gl"
   cd ..
 }
 
@@ -1500,7 +1565,16 @@ build_twolame() {
 }
 
 build_regex() {
-  generic_download_and_install "http://sourceforge.net/projects/mingw/files/Other/UserContributed/regex/mingw-regex-2.5.1/mingw-libgnurx-2.5.1-src.tar.gz/download" mingw-libgnurx-2.5.1
+  download_and_unpack_file "http://sourceforge.net/projects/mingw/files/Other/UserContributed/regex/mingw-regex-2.5.1/mingw-libgnurx-2.5.1-src.tar.gz/download" mingw-libgnurx-2.5.1
+  cd mingw-libgnurx-2.5.1
+    # Patch for static version
+    generic_configure
+    apply_patch_p1 https://raw.githubusercontent.com/arktools/mingw-cross-env/master/src/libgnurx-1-build-static-lib.patch
+    do_make "-f Makefile.mingw-cross-env libgnurx.a"
+    do_make "-f Makefile.mingw-cross-env install-static"
+    # Some packages e.g. libcddb assume header regex.h is paired with libregex.a, not libgnurx.a
+    cp $mingw_w64_x86_64_prefix/lib/libgnurx.a $mingw_w64_x86_64_prefix/lib/libregex.a
+  cd ..
 }
 
 build_gavl() {
@@ -1648,6 +1722,7 @@ build_ffms2() {
     if [[ ! -f "configure" ]]; then
       autoreconf -fiv
     fi
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/ffms2.videosource.cpp.patch
     generic_configure_make_install
   cd ..
 }
@@ -1907,7 +1982,7 @@ build_ffmpeg() {
 
 # add --extra-cflags=$CFLAGS, though redundant, just so that FFmpeg lists what it used in its "info" output
 
-  config_options="--arch=$arch --target-os=mingw32 --cross-prefix=$cross_prefix --pkg-config=pkg-config --disable-doc --enable-gpl --enable-libx264 --enable-avisynth --enable-libxvid --enable-libmp3lame --enable-version3 --enable-zlib --enable-librtmp --enable-libvorbis --enable-libtheora --enable-libspeex --enable-libopenjpeg --enable-gnutls --enable-libgsm --enable-libfreetype --enable-libopus --disable-w32threads --enable-frei0r --enable-filter=frei0r --enable-libvo-aacenc --enable-bzlib --enable-libxavs --extra-cflags=-DPTW32_STATIC_LIB --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libvo-amrwbenc --enable-libschroedinger --enable-libvpx --enable-libilbc --enable-libbs2b --prefix=$mingw_w64_x86_64_prefix $extra_configure_opts --extra-cflags=$CFLAGS" # other possibilities: --enable-w32threads --enable-libflite
+  config_options="--arch=$arch --target-os=mingw32 --cross-prefix=$cross_prefix --pkg-config=pkg-config --disable-doc --enable-gpl --enable-libx264 --enable-avisynth --enable-libxvid --enable-libmp3lame --enable-version3 --enable-zlib --enable-librtmp --enable-libvorbis --enable-libtheora --enable-libspeex --enable-libopenjpeg --enable-gnutls --enable-libgsm --enable-libfreetype --enable-libopus --disable-w32threads --enable-frei0r --enable-filter=frei0r --enable-libvo-aacenc --enable-bzlib --enable-libxavs --extra-cflags=-DPTW32_STATIC_LIB --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libvo-amrwbenc --enable-libschroedinger --enable-libvpx --enable-libilbc --enable-libwavpack --enable-libwebp --enable-libgme --enable-libdcadec --enable-libbs2b --prefix=$mingw_w64_x86_64_prefix $extra_configure_opts --extra-cflags=$CFLAGS" # other possibilities: --enable-w32threads --enable-libflite
   if [[ "$non_free" = "y" ]]; then
     config_options="$config_options --enable-nonfree --enable-libfdk-aac --disable-libfaac --enable-decoder=aac" # To use fdk-aac in VLC, we need to change FFMPEG's default (faac), but I haven't found how to do that... So I disabled it. This could be an new option for the script? -- faac deemed too poor quality and becomes the default -- add it in and uncomment the build_faac line to include it 
     # other possible options: --enable-openssl --enable-libaacplus
@@ -1983,6 +2058,7 @@ build_dependencies() {
   build_libtheora # needs libvorbis, libogg
   build_orc
   build_libschroedinger # needs orc
+  build_regex # needed by ncurses and cddb among others
   build_ncurses
   build_freetype # uses bz2/zlib seemingly
   build_libexpat
@@ -2008,7 +2084,6 @@ build_dependencies() {
   build_libcaca
   build_libmodplug # ffmepg and vlc can use this
   build_zvbi
-  build_regex # Needed by libcddb
   build_libcddb
   build_libvpx
   build_vo_aacenc
@@ -2028,6 +2103,10 @@ build_dependencies() {
   build_vamp-sdk
   build_libsamplerate # for librubberband
   build_libbs2b
+  build_wavpack
+  build_libdcadec
+  build_libgame-music-emu
+  build_libwebp
   build_sox # This is a problem: it must be built before libgsm is created otherwise libgsm clashes with libsndfile
   build_libgsm
   build_twolame
