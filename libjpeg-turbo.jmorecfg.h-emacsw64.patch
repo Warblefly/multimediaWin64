@@ -1,13 +1,13 @@
 --- jmorecfg.h.orig	2015-04-18 09:46:46.916706900 +0100
-+++ jmorecfg.h	2015-04-18 10:27:47.588937600 +0100
-@@ -148,8 +148,10 @@
- /* INT32 must hold at least signed 32-bit values. */
++++ jmorecfg.h	2015-04-18 09:48:14.316719400 +0100
+@@ -142,8 +142,10 @@
+ /* INT16 must hold at least the values -32768..32767. */
  
- #ifndef XMD_H                   /* X11/xmd.h correctly defines INT32 */
+ #ifndef XMD_H                   /* X11/xmd.h correctly defines INT16 */
 +#ifndef _BASETSD_H_ /* w32api defines this in basetsd.d, avoid emacs clash */
- typedef long INT32;
+ typedef short INT16;
  #endif
 +#endif
  
- /* Datatype used for image dimensions.  The JPEG standard only supports
-  * images up to 64K*64K due to 16-bit fields in SOF markers.  Therefore
+ /* INT32 must hold at least signed 32-bit values. */
+ 
