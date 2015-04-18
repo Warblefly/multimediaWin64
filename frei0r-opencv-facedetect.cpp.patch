@@ -1,0 +1,19 @@
+--- src/filter/facedetect/facedetect.cpp.orig	2015-04-17 23:26:27.822481700 +0100
++++ src/filter/facedetect/facedetect.cpp	2015-04-17 23:50:02.383249900 +0100
+@@ -257,11 +257,11 @@
+     {
+         double scale = this->scale == 0? 1.0 : this->scale;
+         CvScalar colors[5] = {
+-            {{cvRound(color[0].r * 255), cvRound(color[0].g * 255), cvRound(color[0].b * 255), cvRound(alpha * 255)}},
+-            {{cvRound(color[1].r * 255), cvRound(color[1].g * 255), cvRound(color[1].b * 255), cvRound(alpha * 255)}},
+-            {{cvRound(color[2].r * 255), cvRound(color[2].g * 255), cvRound(color[2].b * 255), cvRound(alpha * 255)}},
+-            {{cvRound(color[3].r * 255), cvRound(color[3].g * 255), cvRound(color[3].b * 255), cvRound(alpha * 255)}},
+-            {{cvRound(color[4].r * 255), cvRound(color[4].g * 255), cvRound(color[4].b * 255), cvRound(alpha * 255)}},
++            {cvRound(color[0].r * 255), cvRound(color[0].g * 255), cvRound(color[0].b * 255), cvRound(alpha * 255)},
++            {cvRound(color[1].r * 255), cvRound(color[1].g * 255), cvRound(color[1].b * 255), cvRound(alpha * 255)},
++            {cvRound(color[2].r * 255), cvRound(color[2].g * 255), cvRound(color[2].b * 255), cvRound(alpha * 255)},
++            {cvRound(color[3].r * 255), cvRound(color[3].g * 255), cvRound(color[3].b * 255), cvRound(alpha * 255)},
++            {cvRound(color[4].r * 255), cvRound(color[4].g * 255), cvRound(color[4].b * 255), cvRound(alpha * 255)},
+         };
+         
+         for (int i = 0; i < (objects ? objects->total : 0); i++)
