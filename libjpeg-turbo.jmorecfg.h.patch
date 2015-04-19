@@ -1,0 +1,19 @@
+--- jmorecfg.h.orig	2015-04-18 11:07:57.619754000 +0100
++++ jmorecfg.h	2015-04-18 11:08:30.329633400 +0100
+@@ -147,9 +147,15 @@
+ 
+ /* INT32 must hold at least signed 32-bit values. */
+ 
+-#ifndef XMD_H                   /* X11/xmd.h correctly defines INT32 */
++#ifndef XMD_H			/* X11/xmd.h correctly defines INT32 */
++#ifndef _BASETSD_H_		/* Microsoft defines it in basetsd.h */
++#ifndef _BASETSD_H		/* MinGW is slightly different */
++#ifndef QGLOBAL_H		/* Qt defines it in qglobal.h */
+ typedef long INT32;
+ #endif
++#endif
++#endif
++#endif
+ 
+ /* Datatype used for image dimensions.  The JPEG standard only supports
+  * images up to 64K*64K due to 16-bit fields in SOF markers.  Therefore
