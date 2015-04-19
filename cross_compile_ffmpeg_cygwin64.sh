@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+
 # set -x
 # ffmpeg windows cross compile helper/download script
 # Copyright (C) 2014 Roger Pack, the script is under the GPLv3, but output FFmpeg's aren't necessarily
@@ -666,7 +667,10 @@ build_opencv() {
   do_git_checkout https://github.com/Itseez/opencv.git "opencv"
   cd opencv
   # This is only used for a couple of frei0r filters. Surely we can switch off more options than this?
-    do_cmake "-DWITH_IPP=OFF -DWITH_DSHOW=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_opencv_apps=ON -DBUILD_PERF_TESTS=OFF -DBUILD_TESTS=OFF -DBUILD_WITH_DEBUG_INFO=OFF"
+  # WEBP is switched off because it triggers a Cmake bug that removes #define-s of EPSILON and variants
+  # This needs more work
+    do_cmake "-DWITH_IPP=OFF -DWITH_DSHOW=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_opencv_apps=ON -DBUILD_PERF_TESTS=OFF -DBUILD_TESTS=OFF -DBUILD_WITH_DEBUG_INFO=OFF -DWITH_WEBP=OFF"
+  sed -i.bak "s|DBL_EPSILON|2.2204460492503131E-16|g" modules/imgproc/include/opencv2/imgproc/types_c.h
     do_make_install
   export OpenCV_DIR=`pwd`
   export OpenCV_INCLUDE_DIR="${OpenCV_DIR}/include"
@@ -1623,6 +1627,7 @@ build_frei0r() {
     apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/frei0r-lightgraffiti.cpp.patch
     apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/frei0r-vignette.cpp.patch
     apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/frei0r-partik0l.cpp.patch
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/frei0r-opencv-facedetect.cpp.patch
     # These are ALWAYS compiled as DLLs... there is no static library model in frei0r
     do_cmake "-DOpenCV_DIR=${OpenCV_DIR} -DOpenCV_INCLUDE_DIR=${OpenCV_INCLUDE_DIR} -DCMAKE_CXX_FLAGS=-std=c++14"
     do_make_install
@@ -1645,6 +1650,13 @@ build_opustools() {
     ./autogen.sh
   fi
   generic_configure_make_install
+  cd ..
+}
+
+build_libmms() {
+  do_git_checkout git://git.code.sf.net/p/libmms/code libmms-code
+  cd libmms-code
+    generic_configure_make_install
   cd ..
 }
 
@@ -2041,10 +2053,7 @@ build_dependencies() {
 #  build_iconv # mplayer I think needs it for freetype [just it though], vlc also wants it.  looks like ffmpeg can use it too...not sure what for :)
   build_gnutls # needs libnettle, can use iconv it appears
   build_openssl
-  #build_opencv
   build_gavl # Frei0r has this as an optional dependency
-  build_frei0r
-  build_opencv
   build_libutvideo
   #build_libflite # too big for the ffmpeg distro...
   build_sdl # needed for ffplay to be created
@@ -2090,6 +2099,7 @@ build_dependencies() {
   build_libdecklink
   build_liburiparser
   build_libilbc
+  build_libmms
   build_flac
   if [[ -d gsm-1.0-pl13 ]]; then # this is a TERRIBLE kludge because sox mustn't see libgsm
     cd gsm-1.0-pl13
@@ -2106,7 +2116,6 @@ build_dependencies() {
   build_wavpack
   build_libdcadec
   build_libgame-music-emu
-  build_libwebp
   build_sox # This is a problem: it must be built before libgsm is created otherwise libgsm clashes with libsndfile
   build_libgsm
   build_twolame
@@ -2115,6 +2124,9 @@ build_dependencies() {
   build_libass # needs freetype, needs fribidi, needs fontconfig
   build_libopenjpeg
   build_libopenjpeg2
+  build_libwebp
+  build_opencv
+  build_frei0r
   if [[ "$non_free" = "y" ]]; then
     build_fdk_aac
     # build_faac # not included for now, too poor quality :)
