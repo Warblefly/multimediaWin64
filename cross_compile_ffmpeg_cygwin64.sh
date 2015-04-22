@@ -1074,7 +1074,7 @@ build_libschroedinger() {
 build_gnutls() {
   download_and_unpack_file ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.12.tar.xz gnutls-3.3.12
   cd gnutls-3.3.12
-    generic_configure "--disable-cxx --disable-doc" # don't need the c++ version, in an effort to cut down on size... XXXX test difference...
+    generic_configure "--disable-cxx --disable-doc --enable-local-libopts" # don't need the c++ version, in an effort to cut down on size... XXXX test difference...
     do_make_install
   cd ..
   sed -i.bak 's/-lgnutls *$/-lgnutls -lnettle -lhogweed -lgmp -lcrypt32 -lws2_32 -liconv/' "$PKG_CONFIG_PATH/gnutls.pc"
@@ -1472,7 +1472,7 @@ build_mediainfo() {
 		sed -i.bak 's/ -DSIZE_T_IS_LONG//g' Makefile
 		do_make_install
 		cd ../../../../MediaInfoLib/Project/GNU/Library
-		do_configure "--enable-shared=no --enable-static --host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix LDFLAGS=-static-libgcc --with-libcurl"
+		do_configure "--enable-shared=no --enable-static --host=x86_64-w64-mingw32 --prefix=$mingw_w64_x86_64_prefix LDFLAGS=-static-libgcc --with-libcurl --with-libmms"
 		sed -i.bak 's/ -DSIZE_T_IS_LONG//g' Makefile
 		do_make_install
 		cd ../../../../MediaInfo/Project/GNU/CLI
