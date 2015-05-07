@@ -37,7 +37,7 @@ yes_no_sel () {
 }
 
 check_missing_packages () {
-  local check_packages=('curl' 'pkg-config' 'make' 'git' 'svn' 'cmake' 'gcc' 'autoconf' 'libtool' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg' 'patch' 'pax' 'bzr' 'gperf')
+  local check_packages=('curl' 'pkg-config' 'make' 'git' 'svn' 'cmake' 'gcc' 'autoconf' 'libtool' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg' 'patch' 'pax' 'bzr' 'gperf' 'ruby')
   for package in "${check_packages[@]}"; do
     type -P "$package" >/dev/null || missing_packages=("$package" "${missing_packages[@]}")
   done
@@ -321,6 +321,22 @@ do_make() {
   fi
 }
 
+do_rake() {
+  local extra_make_options="$1 -j $cpu_count"
+  local cur_dir2=$(pwd)
+  local touch_name=$(get_small_touchfile_name already_ran_rake "$extra_make_options")
+
+  if [ ! -f $touch_name ]; then
+    echo
+    echo "raking $cur_dir2 as $ PATH=$PATH rake $extra_make_options"
+    echo
+    nice rake $extra_make_options || exit 1
+    touch $touch_name || exit 1 # only touch if the build was OK
+  else
+    echo "already did make $(basename "$cur_dir2")"
+  fi
+}
+
 do_smake() {
   local extra_make_options="$1"
   local cur_dir2=$(pwd)
@@ -470,6 +486,12 @@ generic_configure_make_install() {
   do_make_and_make_install
 }
 
+generic_configure_rake_install() {
+  generic_configure "$1"
+  do_rake_and_rake_install
+}
+
+
 do_make_and_make_install() {
   local extra_make_options="$1"
   do_make "$extra_make_options"
@@ -480,6 +502,18 @@ do_make_and_make_install() {
     touch $touch_name || exit 1
   fi
 }
+
+do_rake_and_rake_install() {
+  local extra_make_options="$1"
+  do_rake "$extra_make_options"
+  local touch_name=$(get_small_touchfile_name already_ran_make_install "$extra_make_options")
+  if [ ! -f $touch_name ]; then
+    echo "rake installing $(pwd) as $ PATH=$PATH rake install $extra_make_options"
+    nice rake install $extra_make_options || exit 1
+    touch $touch_name || exit 1
+  fi
+}
+
 
 do_cmake_and_install() {
   extra_args="$1" 
@@ -869,7 +903,7 @@ build_libdvdnav() {
 build_libdvdcss() {
   do_git_checkout git://git.videolan.org/libdvdcss libdvdcss
   cd libdvdcss/src
-    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libdvdcss.c.patch
+#    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libdvdcss.c.patch
     cd ..
     if [[ ! -f "configure" ]]; then
       autoreconf -fiv || exit 1
@@ -1581,6 +1615,39 @@ build_regex() {
   cd ..
 }
 
+build_boost() { 
+  download_and_unpack_file "http://downloads.sourceforge.net/project/boost/boost/1.58.0/boost_1_58_0.tar.gz" boost_1_58_0
+  cd boost_1_58_0 
+    local touch_name=$(get_small_touchfile_name already_configured "$configure_options $configure_name $LDFLAGS $CFLAGS") 
+    if [ ! -f  "$touch_name" ]; then 
+      ./bootstrap.sh --prefix=${mingw_w64_x86_64_prefix} || exit 1
+      touch -- "$touch_name"
+    else 
+      echo "Already configured Boost libraries"
+    fi
+    local touch_name=$(get_small_touchfile_name already_build "$configure_options $configure_name $LDFLAGS $CFLAGS")
+    if [ ! -f "$touch_name" ]; then
+    # Create the custom build instructions
+    echo "using gcc : mxe : x86_64-w64-mingw32-g++.exe : <rc>x86_64-w64-mingw32-windres.exe <archiver>x86_64-w64-mingw32-ar.exe <ranlib>x86_64-w64-mingw32-ranlib.exe ;" > user-config.jam
+    # Configure and build in one step. ONLY the libraries necessary for mkvtoolnix are built.
+      ./b2 --prefix=${mingw_w64_x86_64_prefix} -j 2 --ignore-site-config --user-config=user-config.jam address-model=64 architecture=x86 binary-format=pe link=static --target-os=windows threadapi=win32 threading=multi toolset=gcc-mxe --layout=tagged --disable-icu cxxflags='-std=c++11' --with-system --with-filesystem --with-regex --with-date_time install
+      touch -- "$touch_name"
+    else
+      echo "Already built and installed Boost libraries"
+    fi
+  cd ..  
+}
+
+build_mkvtoolnix() {
+  do_git_checkout https://github.com/mbunkus/mkvtoolnix.git mkvtoolnix
+  cd mkvtoolnix
+    # Two libraries needed for mkvtoolnix
+    git submodule init
+    git submodule update
+    generic_configure_rake_install "--with-boost=${mingw_w64_x86_64_prefix} --with-boost-system=boost_system-mt --with-boost-filesystem=boost_filesystem-mt --with-boost-date-time=boost_date_time-mt --with-boost-regex=boost_regex-mt --without-curl"
+  cd ..
+}
+
 build_gavl() {
   do_svn_checkout svn://svn.code.sf.net/p/gmerlin/code/trunk/gavl gavl
   cd gavl
@@ -1597,6 +1664,7 @@ build_fdkaac-commandline() {
     generic_configure_make_install
   cd ..
 }
+
 
 #build_cygwin() {
 # Need code to automatically discover most recent snapshot
@@ -1661,7 +1729,7 @@ build_libmms() {
 }
 
 build_curl() {
-  generic_download_and_install http://curl.haxx.se/download/curl-7.40.0.tar.bz2 curl-7.40.0 "--with-winssl --enable-ipv6"
+  generic_download_and_install http://curl.haxx.se/download/curl-7.42.1.tar.bz2 curl-7.42.1 "--with-winssl --enable-ipv6 --with-librtmp"
 }
 
 build_asdcplib() {
@@ -2062,7 +2130,7 @@ build_dependencies() {
   build_libopus
   build_libopencore
   build_libogg
-#  build_libgnurx  
+  build_boost # needed for mkv tools
   build_libspeex # needs libogg for exe's
   build_libvorbis # needs libogg
   build_libtheora # needs libvorbis, libogg
@@ -2133,7 +2201,7 @@ build_dependencies() {
     # build_faac # not included for now, too poor quality :)
     # build_libaacplus # if you use it, conflicts with other AAC encoders <sigh>, so disabled :)
   fi
-  build_librtmp # needs gnutls [or openssl...]
+  build_librtmp # needs gnutls [or openssl...] and curl depends on this too
 #  build_smake # This is going to be useful one day
   build_lua
   build_ladspa # Not a real build: just copying the API header file into place
@@ -2146,7 +2214,7 @@ build_apps() {
 #  build_less
 #  build_coreutils
   build_opustools
-  build_curl # Needed for mediainfo to read Internet streams or files
+  build_curl # Needed for mediainfo to read Internet streams or file, also can get RTMP streamss
   build_gdb # Really useful, and the correct version for Windows executables
   build_mediainfo
   if [[ $build_libmxf = "y" ]]; then
@@ -2165,6 +2233,7 @@ build_apps() {
   build_lsdvd
   build_fdkaac-commandline
   build_qt
+  build_mkvtoolnix
   build_opendcp
 #  build_dvdbackup
   if [[ $build_ffmpeg_shared = "y" ]]; then
