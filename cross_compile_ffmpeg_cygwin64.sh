@@ -662,7 +662,7 @@ build_librtmp() {
 }
 
 #build_qt5() {
-#  generic_download_and_install http://www.mirrorservice.org/sites/download.qt-project.org/archive/qt/5.4/5.4.1/single/qt-everywhere-opensource-src-5.4.1.tar.gz 
+#  generic_download_and_install http://download.qt.io/official_releases/qt/5.4/5.4.1/submodules/qtbase-opensource-src-5.4.1.tar.xz qtbase-opensource-src-5.4.1
 #}
 
 
@@ -782,12 +782,9 @@ build_libvpx() {
     download_and_unpack_file http://webm.googlecode.com/files/libvpx-v1.3.0.tar.bz2 libvpx-v1.3.0
     cd libvpx-v1.3.0
   else
-    do_git_checkout https://git.chromium.org/git/webm/libvpx.git "libvpx_git"
+    do_git_checkout https://chromium.googlesource.com/webm/libvpx "libvpx_git"
     cd libvpx_git
   fi
-  # This is to fix a bizarre Cygwin shell problem, introduced 13 Feb 2015, where the directory name in a shell
-  # expansion also seems to include the executable file name. This needs investigating.
-#  apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libvpx_configure.patch
   export CROSS="$cross_prefix"
   if [[ "$bits_target" = "32" ]]; then
     do_configure "--extra-cflags=-DPTW32_STATIC_LIB --target=x86-win32-gcc --prefix=$mingw_w64_x86_64_prefix --enable-static --disable-shared"
@@ -1179,8 +1176,8 @@ build_libaacplus() {
 }
 
 build_openssl() {
-  download_and_unpack_file http://www.openssl.org/source/openssl-1.0.2a.tar.gz openssl-1.0.2a
-  cd openssl-1.0.2a
+  download_and_unpack_file http://www.openssl.org/source/openssl-1.0.2d.tar.gz openssl-1.0.2d
+  cd openssl-1.0.2d
   export cross="$cross_prefix"
   export CC="${cross}gcc"
   export AR="${cross}ar"
@@ -1198,6 +1195,16 @@ build_openssl() {
   unset CC
   unset AR
   unset RANLIB
+  cd ..
+}
+
+build_intel_quicksync_mfx() { # qsv
+  do_git_checkout https://github.com/mjb2000/mfx_dispatch.git mfx_dispatch_git
+  cd mfx_dispatch_git
+    if [[ ! -f "configure" ]]; then
+      autoreconf -fiv || exit 1
+    fi
+    generic_configure_make_install
   cd ..
 }
 
@@ -1644,7 +1651,7 @@ build_mkvtoolnix() {
     # Two libraries needed for mkvtoolnix
     git submodule init
     git submodule update
-    generic_configure_rake_install "--with-boost=${mingw_w64_x86_64_prefix} --with-boost-system=boost_system-mt --with-boost-filesystem=boost_filesystem-mt --with-boost-date-time=boost_date_time-mt --with-boost-regex=boost_regex-mt --without-curl"
+    generic_configure_rake_install "--with-boost=${mingw_w64_x86_64_prefix} --with-boost-system=boost_system-mt --with-boost-filesystem=boost_filesystem-mt --with-boost-date-time=boost_date_time-mt --with-boost-regex=boost_regex-mt --without-curl --disable-qt"
   cd ..
 }
 
@@ -1652,6 +1659,14 @@ build_gavl() {
   do_svn_checkout svn://svn.code.sf.net/p/gmerlin/code/trunk/gavl gavl
   cd gavl
     generic_configure_make_install "--enable-shared=yes"
+  cd ..
+}
+
+build_gomp() {
+  do_svn_checkout https://github.com/gcc-mirror/gcc/trunk/libgomp gomp
+  cd gomp
+    autoreconf -fvi
+    generic_configure_make_install
   cd ..
 }
 
@@ -1698,7 +1713,7 @@ build_frei0r() {
     apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/frei0r-opencv-facedetect.cpp.patch
     # These are ALWAYS compiled as DLLs... there is no static library model in frei0r
     do_cmake "-DOpenCV_DIR=${OpenCV_DIR} -DOpenCV_INCLUDE_DIR=${OpenCV_INCLUDE_DIR} -DCMAKE_CXX_FLAGS=-std=c++14"
-    do_make_install
+    do_make_install "-j1"
   cd ..
 }
 
@@ -1706,7 +1721,7 @@ build_vidstab() {
   do_git_checkout https://github.com/georgmartius/vid.stab.git vid.stab # "430b4cffeb" # 0.9.8
   cd vid.stab
     sed -i.bak "s/SHARED/STATIC/g" CMakeLists.txt # static build-ify
-    do_cmake
+    do_cmake "-DUSE_OMP:bool=off"
     do_make_install 
   cd ..
 }
@@ -1749,6 +1764,33 @@ build_asdcplib() {
 
 build_libtiff() {
   generic_download_and_install ftp://ftp.remotesensing.org/pub/libtiff/tiff-4.0.4beta.tar.gz tiff-4.0.4beta
+}
+
+build_opencl() {
+# Method: get the headers, then create libOpenCL.a from the vendor-supplied OpenCL.dll
+# on the compilation system.
+# Get the headers from the source
+  mkdir -p ${mingw_w64_x86_64_prefix}/include/CL && cd ${mingw_w64_x86_64_prefix}/include/CL
+    wget --no-clobber http://www.khronos.org/registry/cl/api/1.2/cl_d3d10.h \
+http://www.khronos.org/registry/cl/api/1.2/cl_d3d11.h \
+http://www.khronos.org/registry/cl/api/1.2/cl_dx9_media_sharing.h \
+http://www.khronos.org/registry/cl/api/1.2/cl_ext.h \
+http://www.khronos.org/registry/cl/api/1.2/cl_gl_ext.h \
+http://www.khronos.org/registry/cl/api/1.2/cl_gl.h \
+http://www.khronos.org/registry/cl/api/1.2/cl.h \
+http://www.khronos.org/registry/cl/api/1.2/cl_platform.h \
+http://www.khronos.org/registry/cl/api/1.2/opencl.h \
+http://www.khronos.org/registry/cl/api/1.2/cl.hpp \
+http://www.khronos.org/registry/cl/api/1.2/cl_egl.h
+  cd -
+# Use the installed OpenCL.dll to make libOpenCL.a
+# This is an insecure method. Write something better! FIXME
+  cp /cygdrive/c/Windows/System32/OpenCL.dll .
+  gendef ./OpenCL.dll
+  dlltool.exe -l libOpenCL.a -d OpenCL.def -k -A
+  cp libOpenCL.a ${mingw_w64_x86_64_prefix}/lib/libOpenCL.a
+# Clean up
+  rm OpenCL.dll libOpenCL.a 
 }
 
 build_lua() {
@@ -2029,7 +2071,7 @@ build_ffmpeg() {
 
   # FFmpeg + libav compatible options
   # add libpsapi to enable libdlfcn for Windows to work, thereby enabling frei0r plugins
-  local extra_configure_opts="--enable-libsoxr --enable-fontconfig --enable-libass --enable-libutvideo --enable-libbluray --enable-iconv --enable-libtwolame --extra-cflags=-DLIBTWOLAME_STATIC --enable-libzvbi --enable-libcaca --enable-libmodplug --extra-libs=-lstdc++ --extra-libs=-lpsapi --enable-opengl --extra-libs=-lpng --enable-libvidstab --enable-libx265 --enable-decklink --extra-libs=-loleaut32 --enable-libcdio --enable-libbluray "
+  local extra_configure_opts="--enable-libsoxr --enable-fontconfig --enable-libass --enable-libutvideo --enable-libbluray --enable-iconv --enable-libtwolame --extra-cflags=-DLIBTWOLAME_STATIC --enable-libzvbi --enable-libcaca --enable-libmodplug --extra-libs=-lstdc++ --extra-libs=-lpsapi --enable-opengl --enable-opencl --extra-libs=-lpng --enable-libvidstab --enable-libx265 --enable-decklink --extra-libs=-loleaut32 --enable-libcdio --enable-libbluray "
 
   if [[ $type = "libav" ]]; then
     # libav [ffmpeg fork]  has a few missing options?
@@ -2061,9 +2103,9 @@ build_ffmpeg() {
    local arch=x86_64
   fi
 
-# add --extra-cflags=$CFLAGS, though redundant, just so that FFmpeg lists what it used in its "info" output
+# --extra-cflags=$CFLAGS, though redundant, just so that FFmpeg lists what it used in its "info" output
 
-  config_options="--arch=$arch --target-os=mingw32 --cross-prefix=$cross_prefix --pkg-config=pkg-config --disable-doc --enable-gpl --enable-libx264 --enable-avisynth --enable-libxvid --enable-libmp3lame --enable-version3 --enable-zlib --enable-librtmp --enable-libvorbis --enable-libtheora --enable-libspeex --enable-libopenjpeg --enable-gnutls --enable-libgsm --enable-libfreetype --enable-libopus --disable-w32threads --enable-frei0r --enable-filter=frei0r --enable-libvo-aacenc --enable-bzlib --enable-libxavs --extra-cflags=-DPTW32_STATIC_LIB --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libvo-amrwbenc --enable-libschroedinger --enable-libvpx --enable-libilbc --enable-libwavpack --enable-libwebp --enable-libgme --enable-libdcadec --enable-libbs2b --prefix=$mingw_w64_x86_64_prefix $extra_configure_opts --extra-cflags=$CFLAGS" # other possibilities: --enable-w32threads --enable-libflite
+  config_options="--arch=$arch --target-os=mingw32 --cross-prefix=$cross_prefix --pkg-config=pkg-config --disable-doc --enable-gpl --enable-libx264 --enable-avisynth --enable-libxvid --enable-libmp3lame --enable-version3 --enable-zlib --enable-librtmp --enable-libvorbis --enable-libtheora --enable-libspeex --enable-libopenjpeg --enable-gnutls --enable-libgsm --enable-libfreetype --enable-libopus --disable-w32threads --enable-frei0r --enable-filter=frei0r --enable-libvo-aacenc --enable-bzlib --enable-libxavs --extra-cflags=-DPTW32_STATIC_LIB --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libvo-amrwbenc --enable-libschroedinger --enable-libvpx --enable-libilbc --enable-libwavpack --enable-libwebp --enable-libgme --enable-libdcadec --enable-libbs2b --enable-d3d11va --enable-dxva2 --prefix=$mingw_w64_x86_64_prefix $extra_configure_opts --extra-cflags=$CFLAGS" # other possibilities: --enable-w32threads --enable-libflite
   if [[ "$non_free" = "y" ]]; then
     config_options="$config_options --enable-nonfree --enable-libfdk-aac --disable-libfaac --enable-decoder=aac" # To use fdk-aac in VLC, we need to change FFMPEG's default (faac), but I haven't found how to do that... So I disabled it. This could be an new option for the script? -- faac deemed too poor quality and becomes the default -- add it in and uncomment the build_faac line to include it 
     # other possible options: --enable-openssl --enable-libaacplus
@@ -2122,6 +2164,7 @@ build_dependencies() {
 #  build_iconv # mplayer I think needs it for freetype [just it though], vlc also wants it.  looks like ffmpeg can use it too...not sure what for :)
   build_gnutls # needs libnettle, can use iconv it appears
   build_openssl
+  # build_gomp   # Not yet.
   build_gavl # Frei0r has this as an optional dependency
   build_libutvideo
   #build_libflite # too big for the ffmpeg distro...
@@ -2191,6 +2234,8 @@ build_dependencies() {
   build_fontconfig # needs expat, needs freetype (at least uses it if available), can use iconv, but I believe doesn't currently
   build_libfribidi
   build_libass # needs freetype, needs fribidi, needs fontconfig
+  build_intel_quicksync_mfx
+  build_opencl
   build_libopenjpeg
   build_libopenjpeg2
   build_libwebp
@@ -2233,6 +2278,7 @@ build_apps() {
   build_lsdvd
   build_fdkaac-commandline
   build_qt
+# build_qt5
   build_mkvtoolnix
   build_opendcp
 #  build_dvdbackup
