@@ -923,7 +923,7 @@ build_ncurses() {
     wget http://invisible-island.net/datafiles/current/terminfo.src.gz
     gunzip terminfo.src.gz
   fi
-  generic_download_and_install ftp://invisible-island.net/ncurses/current/ncurses-5.9-20150404.tgz ncurses-5.9-20150404 "--with-libtool --disable-termcap --enable-widec --enable-term-driver --enable-sp-funcs --without-ada --with-debug=no --with-shared=no --enable-database --with-progs --enable-interop --enable-pc-files"
+  generic_download_and_install ftp://invisible-island.net/ncurses/current/ncurses-6.0-20150725.tgz ncurses-6.0-20150725 "--with-libtool --disable-termcap --enable-widec --enable-term-driver --enable-sp-funcs --without-ada --with-debug=no --with-shared=no --enable-database --with-progs --enable-interop --enable-pc-files"
   unset PATH_SEPARATOR
 }
 
@@ -980,11 +980,16 @@ build_libdlfcn() {
 }
 
 build_libjpeg_turbo() {
-  download_and_unpack_file http://downloads.sourceforge.net/project/libjpeg-turbo/1.3.90%20%281.4%20beta1%29/libjpeg-turbo-1.3.90.tar.gz libjpeg-turbo-1.3.90
-  cd libjpeg-turbo-1.3.90
+  do_git_checkout https://github.com/libjpeg-turbo/libjpeg-turbo libjpeg-turbo
+  cd libjpeg-turbo
+#    download_config_files
+    if [[ ! -f "configure" ]]; then
+      autoreconf -fiv || exit 1
+    fi
     sed -i.bak 's/nasm nasmw yasm/yasm nasm nasmw/' configure # tell it to prefer yasm, since nasm on OS X is old and broken for 64 bit builds
-    download_config_files
     generic_configure_make_install
+#    do_cmake
+#    do_make_install
   cd ..
 }
 
@@ -2059,6 +2064,7 @@ build_libdecklink() {
   if [[ ! -f $mingw_w64_x86_64_prefix/include/DeckLinkAPI_i.c ]]; then
     curl https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/DeckLinkAPI.h > $mingw_w64_x86_64_prefix/include/DeckLinkAPI.h  || exit 1
     curl https://raw.githubusercontent.com/rdp/ffmpeg-windows-build-helpers/master/patches/DeckLinkAPI_i.c > $mingw_w64_x86_64_prefix/include/DeckLinkAPI_i.c.tmp  || exit 1
+    curl https://raw.githubusercontent.com/jp9000/obs-studio/master/plugins/decklink/mac/decklink-sdk/DeckLinkAPIVersion.h > $mingw_w64_x86_64_prefix/include/DeckLinkAPIVersion.h  || exit 1
     mv $mingw_w64_x86_64_prefix/include/DeckLinkAPI_i.c.tmp $mingw_w64_x86_64_prefix/include/DeckLinkAPI_i.c
   fi
 }
@@ -2189,7 +2195,10 @@ build_dependencies() {
   build_libgcrypt # Needed by libxmlsec 
   build_libxmlsec
   build_libbluray # needs libxml2, freetype [FFmpeg, VLC use this, at least]
-  build_libjpeg_turbo # mplayer can use this, VLC qt might need it? [replaces libjpeg]
+  build_libopenjpeg
+  build_libopenjpeg2
+  build_libjpeg_turbo # mplayer can use this, VLC qt might need it? [replaces libjpeg],
+                      # Place after other jpeg libraries so headers are over-written
   build_libdvdcss
   build_libdvdread # vlc, mplayer use it. needs dvdcss
   build_libdvdnav # vlc, mplayer use this
@@ -2236,8 +2245,8 @@ build_dependencies() {
   build_libass # needs freetype, needs fribidi, needs fontconfig
   build_intel_quicksync_mfx
   build_opencl
-  build_libopenjpeg
-  build_libopenjpeg2
+#  build_libopenjpeg
+#  build_libopenjpeg2
   build_libwebp
   build_opencv
   build_frei0r
