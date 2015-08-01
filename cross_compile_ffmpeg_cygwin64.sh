@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 
+
 # set -x
 # ffmpeg windows cross compile helper/download script
 # Copyright (C) 2014 Roger Pack, the script is under the GPLv3, but output FFmpeg's aren't necessarily
@@ -1269,11 +1270,14 @@ build_librubberband() {
 }
 
 build_iconv() {
-  generic_download_and_install http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz libiconv-1.14
-  # Apply patch to fix non-exported inline function in gcc-5.2.0
-  apply_patch_p1 https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libiconv-1.14-iconv-fix-inline.patch
-  # We also need an empty langinfo.h to compile this
-  touch $cur_dir/include/langinfo.h
+  download_and_unpack_file http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz libiconv-1.14
+  cd libiconv-1.14
+    # Apply patch to fix non-exported inline function in gcc-5.2.0
+    apply_patch https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libiconv-1.14-iconv-fix-inline.patch
+    # We also need an empty langinfo.h to compile this
+#    touch $cur_dir/include/langinfo.h
+    generic_configure_make_install
+  cd ..
 }
 
 build_libgpg-error() {
