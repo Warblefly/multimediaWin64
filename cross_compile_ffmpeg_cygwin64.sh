@@ -156,11 +156,15 @@ install_cross_compiler() {
   unset CFLAGS # don't want these for the compiler itself since it creates executables to run on the local box
   # pthreads version to avoid having to use cvs for it
   echo "building cross compile gcc [requires internet access]"
-# Quick patch to update mingw to 4.0.1
-  sed -i.bak "s/mingw_w64_release_ver='3.3.0'/mingw_w64_release_ver='4.0.1'/" mingw-w64-build-3.6.6
+# Quick patch to update mingw to 4.0.2
+  sed -i.bak "s/mingw_w64_release_ver='3.3.0'/mingw_w64_release_ver='4.0.2'/" mingw-w64-build-3.6.6
+  sed -i.bak "s/gcc_release_ver='4.9.2'/gcc_release_ver='5.2.0'/" mingw-w64-build-3.6.6
+  sed -i.bak "s/mpfr_release_ver='3.1.2'/mpfr_release_ver='3.1.3'/" mingw-w64-build-3.6.6
+  sed -i.bak "s/binutils_release_ver='2.25'/binutils_release_ver='2.25.1'/" mingw-w64-build-3.6.6
+  sed -i.bak "s/isl_release_ver='0.12.2'/isl_release_ver='0.14'/" mingw-w64-build-3.6.6
 # Gendef compilation throws a char-as-array-index error when invoked with "--target=" : "--host" avoids this.
   sed -i.bak 's#gendef/configure" --build="$system_type" --prefix="$mingw_w64_prefix" --target#gendef/configure" --build="$system_type" --prefix="$mingw_w64_prefix" --host#' mingw-w64-build-3.6.6
-  nice ./mingw-w64-build-3.6.6 --clean-build --disable-shared --default-configure --mingw-w64-ver=4.0.1 --gcc-ver=4.9.2 --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=2.25 --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
+  nice ./mingw-w64-build-3.6.6 --clean-build --disable-shared --default-configure --mingw-w64-ver=4.0.2 --gcc-ver=5.2.0 --pthreads-w32-ver=cvs --cpu-count=$gcc_cpu_count --build-type=$build_choice --enable-gendef --enable-widl --binutils-ver=2.25.1 --verbose || exit 1 # --disable-shared allows c++ to be distributed at all...which seemed necessary for some random dependency...
   export CFLAGS=$original_cflags # reset it
   if [ -d mingw-w64-x86_64 ]; then
     touch mingw-w64-x86_64/compiler.done
@@ -1266,6 +1270,8 @@ build_librubberband() {
 
 build_iconv() {
   generic_download_and_install http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz libiconv-1.14
+  # Apply patch to fix non-exported inline function in gcc-5.2.0
+  apply_patch_p1 https://raw.githubusercontent.com/Warblefly/multimediaWin64/master/libiconv-1.14-iconv-fix-inline.patch
   # We also need an empty langinfo.h to compile this
   touch $cur_dir/include/langinfo.h
 }
