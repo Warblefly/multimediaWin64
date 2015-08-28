@@ -1,3 +1,10 @@
+ABANDONED
+=========
+
+This project is unmaintained. A <a href="https://github.com/Warblefly/MultimediaTools-mingw-w64">new project with the same aim</a> has taken its place. I have switched my development from a Cygwin platform to a native GNU/Linux box.
+
+To cross-compile a large collection of multimedia utilities including up-to-date and very feature-complete FFmpeg, OpenDCP, mpv, GraphicsMagick, opendcp, frei0r plugins, etc., please see my other GitHub project <a href="https://github.com/Warblefly/MultimediaTools-mingw-w64">HERE</a> and get the tarball of Windows 64-bit binaries from <a href="http://johnwarburton.net/blog/?p=28459">my blog HERE</a>.
+
 multimediaWin64
 ===============
 
